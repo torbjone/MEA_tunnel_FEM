@@ -9,38 +9,41 @@ import dolfin as df
 
 eps = 1e-9
 
-# Define set up, corresponding semi infinite homogeneous conductor, to be compared to known analytic solution
-dx_tunnel = 100.0  # um
-dy_tunnel = 100.0
-dz_tunnel = 100.0
-
-x0 = -dx_tunnel / 2
-y0 = -dy_tunnel / 2
-z0 = 0.0
-
-x1 = x0 + dx_tunnel
-y1 = y0 + dy_tunnel
-z1 = z0 + dz_tunnel
-
-nx = 50  # Number of points in mesh. Larger number gives more accuracy, but is computationally demanding
-ny = 50
-nz = 50
 
 sigma = 0.3  # Extracellular conductivity (S/m)
 
+df.parameters['allow_extrapolation'] = False
 
-out_folder = 'results_control'
+root_folder = '..'
+mesh_folder = join(root_folder, "mesh_nmi_tunnel")
+mesh_name = "nmi_mea"
+out_folder = join(root_folder, 'results_control')
 sim_name = "tunnel_test"
-fem_fig_folder = "fem_figs_control"
+fem_fig_folder = join(root_folder, "fem_figs_control")
 [os.makedirs(f, exist_ok=True) for f in [out_folder, fem_fig_folder]]
 
 # example values for validation
-source_pos = np.array([[-5, 0, 5],
-                       [5, 0, 5]])
+source_pos = np.array([[-150, 0, 2.5],
+                       [-160, 0, 2.5]])
 imem = np.array([[-1.0], [1.0]])
 tvec = np.array([0.])
 num_tsteps = imem.shape[1]
 num_sources = source_pos.shape[0]
+
+nx = 200
+ny = 200
+nz = 200
+
+dx_tunnel = 5
+dz_tunnel = 5
+cylinder_radius = 500
+x0 = -cylinder_radius / 2 + eps
+x1 = cylinder_radius / 2 - eps
+y0 = -cylinder_radius / 2 + eps
+y1 = cylinder_radius / 2 - eps
+z0 = 0 + eps
+z1 = cylinder_radius / 4
+
 
 
 def analytic_mea(x, y, z):
@@ -57,6 +60,7 @@ def plot_FEM_results(phi, t_idx):
     """ Plot the set-up, transmembrane currents and electric potential
     """
 
+
     x = np.linspace(x0, x1, nx)
     z = np.linspace(z0, z1, nz)
     y = np.linspace(y0, y1, nz)
@@ -71,10 +75,15 @@ def plot_FEM_results(phi, t_idx):
     phi_plane_xy = np.zeros((len(x), len(z)))
     for x_idx in range(len(x)):
         for z_idx in range(len(z)):
-            phi_plane_xz[x_idx, z_idx] = phi(x[x_idx], 0.0, z[z_idx])
+            try:
+                phi_plane_xz[x_idx, z_idx] = phi(x[x_idx], 0.0, z[z_idx])
+            except RuntimeError:
+                phi_plane_xz[x_idx, z_idx] = np.NaN
         for y_idx in range(len(y)):
-            phi_plane_xy[x_idx, y_idx] = phi(x[x_idx], y[y_idx], 0.0 + eps)
-
+            try:
+                phi_plane_xy[x_idx, y_idx] = phi(x[x_idx], y[y_idx], 0.0 + eps)
+            except RuntimeError:
+                phi_plane_xy[x_idx, y_idx] = np.NaN
     plt.close("all")
     fig = plt.figure(figsize=[18, 9])
     fig.subplots_adjust(hspace=0.9, bottom=0.07, top=0.97, left=0.2)
@@ -126,66 +135,31 @@ def plot_FEM_results(phi, t_idx):
     plt.savefig(join(fem_fig_folder, 'results_{}_t_idx_{}.png'.format(sim_name, t_idx)))
 
 
-def refine_mesh(mesh):
-    """" To refine selected parts of the mesh. """
-    for r in [2.5]:#[20, 15, 10, 8]:
-        print("Refining ...")
-        cell_markers = df.MeshFunction("bool", mesh, dim=mesh.topology().dim()-1)
-        cell_markers.set_all(False)
-        for cell in df.cells(mesh):
-            # p = np.sum(np.array(cell.midpoint()[:])**2)
-            if np.abs(cell.midpoint()[2]) < r:
-                cell_markers[cell] = True
-        mesh = df.refine(mesh, cell_markers)
 
-        print(mesh.num_cells())
-    mesh.smooth()
-    return mesh
-
-
-# Create classes for defining parts of the boundaries and the interior
-# of the domain
-class LeftTunnel(df.SubDomain):
-    def inside(self, x, on_boundary):
-        return df.near(x[0], x0)
-
-
-class RightTunnel(df.SubDomain):
-    def inside(self, x, on_boundary):
-        return df.near(x[0], x1)
-
-
-# Initialize sub-domain instances
-left = LeftTunnel()
-right = RightTunnel()
 
 # Define mesh
-mesh = df.BoxMesh(df.Point(x0, y0, z0), df.Point(x1, y1, z1), nx, ny, nz)
+mesh = df.Mesh(join(mesh_folder, "{}.xml".format(mesh_name)))
+subdomains = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_physical_region.xml".format(mesh_name)))
+boundaries = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_facet_region.xml".format(mesh_name)))
+
 
 print("Number of cells in mesh: ", mesh.num_cells())
 # mesh = refine_mesh(mesh)
 
 np.save(join(out_folder, "mesh_coordinates.npy"), mesh.coordinates())
 
-
-# Initialize mesh function for interior domains
-domains = df.MeshFunction("size_t", mesh, mesh.topology().dim())
-domains.set_all(0)
-
-# Initialize mesh function for boundary domains.
-boundaries = df.MeshFunction("size_t", mesh, mesh.topology().dim()-1)
-boundaries.set_all(0)
-left.mark(boundaries, 1)  # Mark ends of tunnel to enforce ground
-right.mark(boundaries, 1)
-
+sigma = df.Constant(sigma)
 
 V = df.FunctionSpace(mesh, "CG", 2)
-ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
-dx = df.Measure("dx", domain=mesh, subdomain_data=domains)
-
 v = df.TestFunction(V)
 u = df.TrialFunction(V)
-a = df.inner(sigma * df.grad(u), df.grad(v)) * dx
+
+
+ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
+dx = df.Measure("dx", domain=mesh, subdomain_data=subdomains)
+
+
+a = df.inner(sigma * df.grad(u), df.grad(v)) * dx(1)
 # Define function space and basis functions
 
 # This corresponds to Neumann boundary conditions zero, i.e. all outer boundaries are insulating.
@@ -214,7 +188,7 @@ for t_idx in range(num_tsteps):
     df.solve(A, phi.vector(), b, 'cg', "ilu")
 
     # df.File(join(out_folder, "phi_t_vec_{}.xml".format(t_idx))) << phi
-    np.save(join(out_folder, "phi_t_vec_{}.npy".format(t_idx)), phi.vector())
+    np.save(join(out_folder, "phi_t_vec_{}_out_of_tunnel.npy".format(t_idx)), phi.vector())
 
     plot_FEM_results(phi, t_idx)
 
