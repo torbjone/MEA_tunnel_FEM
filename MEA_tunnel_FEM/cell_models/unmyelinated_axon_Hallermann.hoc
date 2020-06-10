@@ -6,15 +6,20 @@ proc celldef() {
   geom_nseg()
 }
 
-create axon[1]
+create soma[1], axon[1]
 
 
 proc topol() { local i
   basic_shape()
+  connect axon(0), soma(0)
 }
 proc basic_shape() {
+  soma[0] {pt3dclear()
+  pt3dadd(-200, 0, 95, 10) pt3dadd(-200, 0, 105, 10)}
+
   axon[0] {pt3dclear()
-  pt3dadd(-100, 0, 0, 0.5) pt3dadd(100, 0, 0, 0.5)}
+  pt3dadd(-200, 0, 95, 0.3) pt3dadd(-200, 0, 2.5, 0.3)
+  pt3dadd(200, 0, 2.5, 0.3)}
 }
 
 objref all

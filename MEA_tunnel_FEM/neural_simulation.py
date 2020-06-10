@@ -28,13 +28,13 @@ def return_cell():
         'passive' : False,   # switch off passive mechs
         'nsegs_method' : 'lambda_f',
         'lambda_f' : 1000.,
-        'dt' : 2.**-7,   # [ms] dt's should be in powers of 2
+        'dt' : 2.**-6,   # [ms] dt's should be in powers of 2
         'tstart' : -200.,    # start time of simulation, recorders start at t=0
-        'tstop' : 2.,   # stop simulation at 2 ms.
+        'tstop' : 3.,   # stop simulation at 2 ms.
     }
 
     cell = LFPy.Cell(**cell_parameters)
-    cell.set_pos(x=-np.max(cell.xmid) / 2, z=2.5)
+    cell.set_pos(x=-200, z=100)
 
     #  To induce a spike:
     synapseParameters = {
@@ -43,7 +43,7 @@ def return_cell():
         'syntype' : 'Exp2Syn',   # conductance based double-exponential synapse
         'tau1' : 0.1,            # Time constant, decay
         'tau2' : 0.1,            # Time constant, decay
-        'weight' : 0.004,         # Synaptic weight
+        'weight' : 0.0075,         # Synaptic weight
         'record_current' : False, # Will enable synapse current recording
     }
 
@@ -56,11 +56,15 @@ def return_cell():
 
 cell = return_cell()
 
+# print(cell.xmid, cell.ymid, cell.zmid)
+
 source_pos = np.array([cell.xmid, cell.ymid, cell.zmid]).T
 np.save(join(outfolder, "source_pos.npy"), source_pos)
 np.save(join(outfolder, "axon_imem.npy"), cell.imem)
 np.save(join(outfolder, "axon_tvec.npy"), cell.tvec)
 np.save(join(outfolder, "axon_vmem.npy"), cell.vmem)
+
+print(np.sum(cell.imem, axis=0))
 
 print(cell.imem.shape)
 
@@ -70,14 +74,22 @@ max_imem_t_idx = np.argmax(np.abs(cell.imem[-1] - cell.imem[0, 0]))
 fig = plt.figure(figsize=[9, 9])
 fig.subplots_adjust(wspace=0.5, hspace=0.5)
 
-ax1 = fig.add_subplot(221, xlabel="Time (ms)", ylabel="Membrane potential (mV)")
-ax2 = fig.add_subplot(222, xlabel="Time (ms)", ylabel="Transmembrane Current (nA)")
-ax3 = fig.add_subplot(212, xlabel="x ($\mu$m)",
+
+ax0 = fig.add_subplot(221, xlabel="x ($\mu$m)", ylabel="z ($\mu$m)", title="morphology")
+ax1 = fig.add_subplot(222, xlabel="time (ms)", ylabel="membrane potential (mV)")
+ax2 = fig.add_subplot(223, xlabel="time (ms)", ylabel="transmembrane current (nA)")
+ax3 = fig.add_subplot(224, xlabel="x ($\mu$m)",
                       ylabel="Membrane current at t={:1.2f}".format(cell.tvec[max_vmem_t_idx]))
 ax1.axvline(cell.tvec[max_imem_t_idx], ls=":", c='gray')
 ax2.axvline(cell.tvec[max_imem_t_idx], ls=":", c='gray')
 [ax1.plot(cell.tvec, cell.vmem[idx, :]) for idx in range(cell.totnsegs)]
 [ax2.plot(cell.tvec, cell.imem[idx, :]) for idx in range(cell.totnsegs)]
+
+for comp in range(cell.totnsegs):
+    if comp == 0:
+        ax0.plot(cell.xmid[comp], cell.zmid[comp], 'o', ms=12, c='k')
+    else:
+        ax0.plot([cell.xstart[comp], cell.xend[comp]], [cell.zstart[comp], cell.zend[comp]], c='k')
 
 clrs = lambda t_idx: plt.cm.Reds(t_idx / len(cell.tvec))
 for t_idx in np.arange(len(cell.tvec)):

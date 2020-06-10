@@ -1,4 +1,5 @@
 import os
+import sys
 from os.path import join
 import numpy as np
 import matplotlib
@@ -16,6 +17,7 @@ df.parameters['allow_extrapolation'] = False
 
 root_folder = '..'
 mesh_folder = join(root_folder, "mesh_nmi_tunnel")
+neural_sim_folder = join(root_folder, "neural_sim_results")
 mesh_name = "nmi_mea"
 out_folder = join(root_folder, 'results_control')
 sim_name = "tunnel_test"
@@ -23,12 +25,30 @@ fem_fig_folder = join(root_folder, "fem_figs_control")
 [os.makedirs(f, exist_ok=True) for f in [out_folder, fem_fig_folder]]
 
 # example values for validation
-source_pos = np.array([[-150, 0, 2.5],
-                       [-160, 0, 2.5]])
-imem = np.array([[-1.0], [1.0]])
-tvec = np.array([0.])
+# source_pos = np.array([[-150, 0, 2.5],
+#                        [-160, 0, 2.5]])
+# imem = np.array([[-1.0], [1.0]])
+# tvec = np.array([0.])
+source_pos = np.load(join(neural_sim_folder, "source_pos.npy"))
+# print(source_pos)
+
+imem = np.load(join(neural_sim_folder, "axon_imem.npy"))
+vmem = np.load(join(neural_sim_folder, "axon_vmem.npy"))
+tvec = np.load(join(neural_sim_folder, "axon_tvec.npy"))
 num_tsteps = imem.shape[1]
 num_sources = source_pos.shape[0]
+
+cell_plot_positions = [[-200, 0, 100],
+                       [-150, 0, 2.5],
+                       [0, 0, 2.5],
+                       #[150, 0, 2.5]
+                       ]
+
+cell_plot_idxs = []
+for p_idx in range(len(cell_plot_positions)):
+    cell_plot_idxs.append(np.argmin(np.sum((cell_plot_positions[p_idx] - source_pos)**2, axis=1)))
+
+plot_idx_clrs = lambda idx: plt.cm.viridis(idx / len(cell_plot_idxs))
 
 nx = 200
 ny = 200
@@ -37,30 +57,31 @@ nz = 200
 dx_tunnel = 5
 dz_tunnel = 5
 cylinder_radius = 500
-x0 = -cylinder_radius / 2 + eps
-x1 = cylinder_radius / 2 - eps
-y0 = -cylinder_radius / 2 + eps
-y1 = cylinder_radius / 2 - eps
+tunnel_radius = 5
+structure_radius = 100
+structure_height = 55
+
+x0 = -cylinder_radius / 2
+x1 = cylinder_radius / 2
+y0 = -cylinder_radius / 2
+y1 = cylinder_radius / 2
 z0 = 0 + eps
 z1 = cylinder_radius / 4
 
 
-
-def analytic_mea(x, y, z):
+def analytic_mea(x, y, z, t_idx):
     phi = 0
     for idx in range(len(imem)):
         r = np.sqrt((x - source_pos[idx, 0])**2 +
                     (y - source_pos[idx, 1])**2 +
                     (z - source_pos[idx, 2])**2)
-        phi += imem[idx] / (2 * sigma * np.pi * r)
+        phi += imem[idx, t_idx] / (2 * sigma * np.pi * r)
     return phi
 
 
 def plot_FEM_results(phi, t_idx):
     """ Plot the set-up, transmembrane currents and electric potential
     """
-
-
     x = np.linspace(x0, x1, nx)
     z = np.linspace(z0, z1, nz)
     y = np.linspace(y0, y1, nz)
@@ -69,7 +90,7 @@ def plot_FEM_results(phi, t_idx):
     analytic = np.zeros(len(x))
     for idx in range(len(x)):
         mea_x_values[idx] = phi(x[idx], 0, eps)
-        analytic[idx] = analytic_mea(x[idx], 0, 1e-9)
+        analytic[idx] = analytic_mea(x[idx], 0, 1e-9, t_idx)
 
     phi_plane_xz = np.zeros((len(x), len(z)))
     phi_plane_xy = np.zeros((len(x), len(z)))
@@ -84,57 +105,72 @@ def plot_FEM_results(phi, t_idx):
                 phi_plane_xy[x_idx, y_idx] = phi(x[x_idx], y[y_idx], 0.0 + eps)
             except RuntimeError:
                 phi_plane_xy[x_idx, y_idx] = np.NaN
+
+
     plt.close("all")
-    fig = plt.figure(figsize=[18, 9])
-    fig.subplots_adjust(hspace=0.9, bottom=0.07, top=0.97, left=0.2)
+    fig = plt.figure(figsize=[6, 9])
+    fig.subplots_adjust(hspace=0.9, bottom=0.12, top=0.97, left=0.12, wspace=0.4)
 
-    ax_setup = fig.add_subplot(511, aspect=1, xlabel='x [$\mu$m]', ylabel='z [$\mu$m]',
-                          title='Axon (green) and tunnel (gray)', xlim=[x0 - 5, x1 + 5], ylim=[z0 - 5, z1 + 5])
-
-    axon_center_idx = np.argmin(np.abs(source_pos[:, 0] - 0))
 
     imem_max = np.max(np.abs(imem))
-    ax_imem_temporal = fig.add_axes([0.05, 0.8, 0.08, 0.1], xlabel='Time [ms]', ylabel='nA',
+    ax_vmem = fig.add_subplot(523, xlabel='time [ms]', ylabel='mV',
+                                    xlim=[0, tvec[-1]], ylim=[-110, 30],
+                          title='membrane potentials')
+
+    ax_imem = fig.add_subplot(524, xlabel='time [ms]', ylabel='nA',
                                     xlim=[0, tvec[-1]], ylim=[-imem_max, imem_max],
-                          title='Transmembrane currents\n(x=0)')
+                          title='transmembrane currents')
 
-    ax_imem_spatial = fig.add_subplot(512, xlabel=r'x [$\mu$m]', ylabel='nA',
-                                      ylim=[-imem_max - 1, imem_max + 1],
-                          title='Transmembrane currents across axon', xlim=[x0 - 5, x1 + 5])
+    ax_setup = fig.add_subplot(511, aspect=1, xlabel='x [$\mu$m]', ylabel='z [$\mu$m]',
+                          title='set-up',
+                               xlim=[x0 - 5, x1 + 5], ylim=[z0 - 5, z1 + 5])
 
-    ax1 = fig.add_subplot(513, aspect=1, xlabel=r'x [$\mu$m]', ylabel=r'y [$\mu$m]',
-                          title='Potential cross section (z=0)')
-
-    ax2 = fig.add_subplot(514, aspect=1, xlabel=r'x [$\mu$m]', ylabel=r'z [$\mu$m]',
+    ax_xz = fig.add_subplot(513, aspect=1, xlabel=r'x [$\mu$m]', ylabel=r'z [$\mu$m]',
                           title='Potential cross section (y=0)')
 
-    ax3 = fig.add_subplot(515, xlabel=r'x [$\mu$m]', ylabel='MEA potential (mV)',
-                          xlim=[x0 - 5, x1 + 5])
+    ax_xy = fig.add_subplot(514, aspect=1, xlabel=r'x [$\mu$m]', ylabel=r'y [$\mu$m]',
+                          title='Potential cross section (z=0)')
+
+    ax_mea = fig.add_subplot(515, xlabel=r'x [$\mu$m]', ylabel='mV',
+                           xlim=[x0 - 5, x1 + 5], ylim=[-1, 1])
 
     #  Draw set up with tunnel and axon
-    rect = mpatches.Rectangle([x0, z0], dx_tunnel, dz_tunnel, ec="k", fc='0.8')
+    rect = mpatches.Rectangle([-structure_radius, tunnel_radius],
+                              2 * structure_radius, structure_height, ec="k", fc='0.8')
     ax_setup.add_patch(rect)
 
+
     ax_setup.plot(source_pos[:, 0], source_pos[:, 2], c='g', lw=2)
-    ax_imem_temporal.plot(tvec, imem[axon_center_idx, :])
-    ax_imem_temporal.axvline(tvec[t_idx], c='gray', ls="--")
+    for counter, p_idx in enumerate(cell_plot_idxs):
+        ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
+                      c=plot_idx_clrs(counter), marker='o')
 
-    ax_imem_spatial.plot(source_pos[:, 0], imem[:, t_idx])
+        ax_imem.plot(tvec, imem[p_idx, :], c=plot_idx_clrs(counter))
+        ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs(counter))
 
-    img1 = ax1.imshow(phi_plane_xy.T, interpolation='nearest', origin='lower', cmap='bwr',
-                      extent=(x[0], x[-1], y[0], y[-1]))
-    img2 = ax2.imshow(phi_plane_xz.T, interpolation='nearest', origin='lower', cmap='bwr',
-                      extent=(x[0], x[-1], z[0], z[-1]))
+    ax_imem.axvline(tvec[t_idx], c='gray', ls="--")
+    ax_vmem.axvline(tvec[t_idx], c='gray', ls="--")
+    # ax_imem_spatial.plot(source_pos[:, 0], imem[:, t_idx])
 
-    cax = fig.add_axes([0.95, 0.5, 0.01, 0.1])
+    xy_masked = np.ma.masked_where(np.isnan(phi_plane_xy.T), phi_plane_xy.T)
+    xz_masked = np.ma.masked_where(np.isnan(phi_plane_xz.T), phi_plane_xz.T)
+
+    vmax = 1
+    from matplotlib.colors import SymLogNorm
+    img1 = ax_xy.imshow(xy_masked, interpolation='nearest', origin='lower', cmap='bwr',
+                      extent=(x[0], x[-1], y[0], y[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
+                        #vmin=-vmax, vmax=vmax)
+    img2 = ax_xz.imshow(xz_masked, interpolation='nearest', origin='lower', cmap='bwr',
+                      extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
+                        #vmin=-vmax, vmax=vmax)
+
+    cax = fig.add_axes([0.85, 0.25, 0.01, 0.15])
 
     plt.colorbar(img1, cax=cax, label="mV")
-    l, = ax3.plot(x, mea_x_values,  lw=2, c='k')
-    la, = ax3.plot(x, analytic,  lw=1, c='r', ls="--")
-    fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False)
-    plt.savefig(join(fem_fig_folder, 'results_{}_t_idx_{}.png'.format(sim_name, t_idx)))
-
-
+    l, = ax_mea.plot(x, mea_x_values,  lw=2, c='k')
+    la, = ax_mea.plot(x, analytic,  lw=1, c='r', ls="--")
+    fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False, loc="lower right")
+    plt.savefig(join(fem_fig_folder, 'results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
 
 
 # Define mesh
@@ -169,8 +205,7 @@ L = df.Constant(0) * v * dx
 bcs = [df.DirichletBC(V, 0.0, boundaries, 1)]
 
 
-for t_idx in range(num_tsteps):
-
+for t_idx in range(num_tsteps)[:4]:
     print("Time step {} of {}".format(t_idx, num_tsteps))
     phi = df.Function(V)
     A = df.assemble(a)
