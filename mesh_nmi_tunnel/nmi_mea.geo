@@ -1,8 +1,8 @@
-mesh_outer = 25;
-tunnel_cover_mesh_size = 1;
-tunnel_mesh_size = 0.1;
+mesh_outer = 50;
+tunnel_cover_mesh_size = 2;
+tunnel_mesh_size = 0.25;
 
-cylinder_radius = 1000;
+cylinder_radius = 500;
 
 structure_radius = 100;
 cover_height = 50;
