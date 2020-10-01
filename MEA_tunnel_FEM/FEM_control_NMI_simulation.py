@@ -282,8 +282,8 @@ def reconstruct_MEA_times_from_FEM():
     ax_mea_free.set_title("I", color="orange")
     ax_mea_tunnel.set_title("II", color="orange")
 
-    ax_setup.text(-195, 105, "soma", color="gray", va='bottom')
-    ax_setup.text(-200, 75, "axon", color="gray", va='top', rotation=-90)
+    ax_setup.text(-185, 100, "soma", color="k", va='bottom')
+    ax_setup.text(-195, 75, "axon", color="k", va='top', rotation=-90)
     ax_setup.text(95, 55, "tunnel lid", ha='right', va='top')
     ax_setup.text(247, -3, "electrode plate", ha='right', va='top')
     #  Draw set up with tunnel and axon
@@ -295,7 +295,7 @@ def reconstruct_MEA_times_from_FEM():
                               2000, -1000, ec="k", fc='0.7', linewidth=0.5)
     ax_setup.add_patch(rect_bottom)
 
-    ax_setup.plot(source_pos[:, 0], source_pos[:, 2], c='gray', lw=1)
+    ax_setup.plot(source_pos[:, 0], source_pos[:, 2], c='gray', lw=2)
     ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='gray', marker='^', ms=17)
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
@@ -314,16 +314,41 @@ def reconstruct_MEA_times_from_FEM():
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs(counter), lw=2)
 
+
+    num = 11
+    levels = np.logspace(-2.5, 0, num=num)
+    scale_max = 1.
+
+    levels_norm = scale_max * np.concatenate((-levels[::-1], levels))
+    bwr_cmap = plt.cm.get_cmap('bwr_r')  # rainbow, spectral, RdYlBu
+
+    colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2))) for i in range(len(levels_norm) - 1)]
+    colors_from_map[num - 1] = (1.0, 1.0, 1.0, 1.0)
+
+
     # xy_masked = np.ma.masked_where(np.isnan(phi_plane_xy.T), phi_plane_xy.T)
     xz_masked = np.ma.masked_where(np.isnan(phi_plane_xz), phi_plane_xz)
     from matplotlib.colors import SymLogNorm, LogNorm
-    img1 = ax_setup.imshow(xz_masked[:, :, 0].T, interpolation='nearest', origin='lower', cmap='bwr',
-                      extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
-    vmax = 1
+
+    #img1 = ax_setup.imshow(xz_masked[:, :, 0].T, interpolation='nearest', origin='lower', cmap='bwr',
+    #                  extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
+    #vmax = 1
+
+    ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, 0],
+                                zorder=-2, colors=colors_from_map,
+                                levels=levels_norm, extend='both')
+
+    ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, 0].T, colors='k', linewidths=(1), zorder=-2,
+                levels=levels_norm)
 
     cax = fig.add_axes([0.83, 0.67, 0.01, 0.2])
 
-    cbar = plt.colorbar(img1, cax=cax, label="$\phi$ (mV)")
+    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (mV)")
+    cbar.set_ticks(np.array([-1, -0.1, -0.01, 0.01, 0.1, 1]) * scale_max)
+    #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
+    #                    fontsize=7, rotation=0)
+
+
     l, = ax_mea_free.plot(tvec, mea_fem[0],  lw=2, c='k')
     la, = ax_mea_tunnel.plot(tvec, mea_fem[1],  lw=2, c='k', ls="-")
     # fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False, loc="lower right")
@@ -338,7 +363,20 @@ def reconstruct_MEA_times_from_FEM():
     mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel], "BCD", xpos=0.0)
 
     for t_idx in range(num_tsteps):
-        img1.set_data(xz_masked[:, :, t_idx].T)
+        #ep_intervals.set_data
+
+        for tp in ep_intervals.collections:
+            tp.remove()
+        ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, t_idx].T,
+                                         zorder=-2, colors=colors_from_map,
+                                         levels=levels_norm, extend='both')
+        for tp in ep_intervals_.collections:
+            tp.remove()
+
+        ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T, colors='k', linewidths=(1), zorder=-2,
+                         levels=levels_norm)
+
+        #ep_intervals.set_data(xz_masked[:, :, t_idx].T)
                         #vmin=-vmax, vmax=vmax)
         t1.set_xdata(tvec[t_idx])
         t2.set_xdata(tvec[t_idx])
@@ -346,15 +384,44 @@ def reconstruct_MEA_times_from_FEM():
 
         plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
 
-    img1.set_data([[]])
+    #ep_intervals.set_data([[]])
+
     cax.clear()
+    t1.set_xdata(100)
+    t2.set_xdata(100)
+    t3.set_xdata(100)
 
-    img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T, interpolation='nearest', origin='lower', cmap='Reds',
-                      extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
+    num = 11
+    levels = np.logspace(-2.5, 0, num=num)
+    scale_max = 1.
 
-    cbar = plt.colorbar(img1, cax=cax, label="$\phi$ (mV)")
+    levels_norm = scale_max * levels
+    bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
 
-    plt.savefig(join(fem_fig_folder, 'max_results_{}.png'.format(sim_name)))
+    colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2))) for i in range(len(levels_norm) - 1)]
+    #colors_from_map[0] = (1.0, 1.0, 1.0, 1.0)
+
+
+    for tp in ep_intervals.collections:
+        tp.remove()
+    ep_intervals = ax_setup.contourf(x, z, np.max(np.abs(xz_masked[:, :, :]), axis=-1).T,
+                                     zorder=-2, colors=colors_from_map,
+                                     levels=levels_norm, extend='both')
+
+    for tp in ep_intervals_.collections:
+        tp.remove()
+    ep_intervals_ = ax_setup.contour(x, z, np.max(np.abs(xz_masked[:, :, :]), axis=-1).T, colors='k', linewidths=(1), zorder=-2,
+                                     levels=levels_norm)
+
+    #img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T, interpolation='nearest', origin='lower', cmap='Reds',
+    #                  extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
+
+    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (mV)")
+    cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
+    #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
+    #                    fontsize=7, rotation=0)
+    plt.savefig(join(root_folder, 'max_results_{}_.png'.format(sim_name)))
+
 
 if __name__ == '__main__':
     reconstruct_MEA_times_from_FEM()
