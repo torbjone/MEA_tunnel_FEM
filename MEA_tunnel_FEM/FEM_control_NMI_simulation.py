@@ -185,7 +185,6 @@ def simulate_FEM():
     subdomains = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_physical_region.xml".format(mesh_name)))
     boundaries = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_facet_region.xml".format(mesh_name)))
 
-
     print("Number of cells in mesh: ", mesh.num_cells())
     # mesh = refine_mesh(mesh)
 
@@ -200,7 +199,6 @@ def simulate_FEM():
     ds = df.Measure("ds", domain=mesh, subdomain_data=boundaries)
     dx = df.Measure("dx", domain=mesh, subdomain_data=subdomains)
 
-
     a = df.inner(sigma_vec * df.grad(u), df.grad(v)) * dx(1)
     # Define function space and basis functions
 
@@ -209,7 +207,6 @@ def simulate_FEM():
 
     # Define Dirichlet boundary conditions outer cylinder boundaries
     bcs = [df.DirichletBC(V, 0.0, boundaries, 1)]
-
 
     for t_idx in range(num_tsteps):
 
@@ -241,6 +238,31 @@ def simulate_FEM():
 
         plot_FEM_results(phi, t_idx)
 
+def plot_soma_EAP_amp_with_distance():
+    x = np.linspace(x0, x1, nx)
+    z = np.linspace(z0, z1, nz)
+    phi_plane_xz = np.zeros((len(x), len(z), len(tvec)))
+    for t_idx in range(num_tsteps):
+        phi_plane_xz[:, :, t_idx] = np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
+
+    soma_height = 100
+    soma_diam = 10
+    soma_xpos = -200
+    z_idx = np.argmin(np.abs(z - soma_height))
+
+    x_idxs = np.where(x > soma_xpos + soma_diam)
+
+    peak_to_peaks = np.zeros(len(x))
+    for x_idx in range(len(x)):
+        peak_to_peaks[x_idx] = np.max(phi_plane_xz[x_idx, z_idx]) - np.min(phi_plane_xz[x_idx, z_idx])
+        plt.plot(phi_plane_xz[x_idx, z_idx])
+    plt.savefig(join(root_folder, "all_spikes_x_dir.png"))
+
+    plt.close("all")
+    fig = plt.figure(figsize=[5, 5])
+    ax1 = fig.add_subplot(111, xlabel="distance from soma ($\mu$m)", ylabel="$\mu$V", xlim=[0, 70])
+    plt.plot(x[x_idxs] - soma_xpos, peak_to_peaks[x_idxs] * 1000)
+    plt.savefig(join(root_folder, "peak_to_peak_amp_with_distance.pdf"))
 
 def reconstruct_MEA_times_from_FEM():
     x = np.linspace(x0, x1, nx)
@@ -424,4 +446,5 @@ def reconstruct_MEA_times_from_FEM():
 
 
 if __name__ == '__main__':
-    reconstruct_MEA_times_from_FEM()
+    plot_soma_EAP_amp_with_distance()
+    # reconstruct_MEA_times_from_FEM()
