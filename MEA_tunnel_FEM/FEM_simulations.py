@@ -59,17 +59,17 @@ nz = 200
 
 dx_tunnel = 5
 dz_tunnel = 5
-cylinder_radius = 500
+cylinder_radius = 1000
 tunnel_radius = 5
 structure_radius = 100
 structure_height = 55
 
-x0 = -cylinder_radius / 2
-x1 = cylinder_radius / 2
-y0 = -cylinder_radius / 2
-y1 = cylinder_radius / 2
+x0 = -cylinder_radius / 4
+x1 = cylinder_radius / 4
+y0 = -cylinder_radius / 4
+y1 = cylinder_radius / 4
 z0 = 0 + eps
-z1 = cylinder_radius / 4
+z1 = cylinder_radius / 8
 
 
 def analytic_mea(x, y, z, t_idx):
@@ -460,6 +460,6 @@ def reconstruct_MEA_times_from_FEM():
 
 
 if __name__ == '__main__':
-    # simulate_FEM()
+    simulate_FEM()
     plot_soma_EAP_amp_with_distance()
-    # reconstruct_MEA_times_from_FEM()
+    reconstruct_MEA_times_from_FEM()
