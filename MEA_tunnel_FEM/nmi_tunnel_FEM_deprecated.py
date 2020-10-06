@@ -9,7 +9,7 @@ import dolfin as df
 
 eps = 1e-9
 
-sigma = 0.3  # Extracellular conductivity (S/m)
+sigma = 1.0  # Extracellular conductivity (S/m)
 
 
 out_folder = 'results_nmi'

@@ -10,7 +10,7 @@ import LFPy
 
 
 morph_file = '950923b.CNG.swc'
-# morphology_name = '050217-zA.CNG.swc'
+neuron.load_mechanisms(join("HallermannEtAl2012"))
 cell_parameters = {
         'morphology': morph_file,
         'v_init': -85,
@@ -24,6 +24,8 @@ cell_parameters = {
 }
 
 cell = LFPy.Cell(**cell_parameters)
+cell.set_rotation(x=np.pi/2)
+cell.set_pos(x=-200, z=102.5)
 
 stim_params = {
              'idx': 0,
@@ -42,8 +44,7 @@ syn.set_spike_times(np.array([0.1]))
 #     print(sec.name())
 
 # print cell.totnsegs
-cell.set_rotation(x=np.pi/2)
-cell.set_pos(x=-200, z=102.5)
+
 print(np.min(cell.zmid))
 cell.simulate(rec_vmem=True, rec_imem=True)
 
@@ -129,9 +130,6 @@ ax5.plot(elec_x - cell.xmid[0], peak_to_peak_amps, 'b', lw=2)
 ax5.axhline(noise_level, ls='--', c='gray')
 ax5.axvline(noise_level_dist, ls='--', c='gray')
 ax5.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(noise_level_dist))
-
-
-
 
 
 plt.savefig(join("morph_test.png"))

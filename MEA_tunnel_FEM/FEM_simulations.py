@@ -11,7 +11,7 @@ from plotting_convention import mark_subplots, simplify_axes
 
 
 eps = 1e-9
-sigma = 0.3  # Extracellular conductivity (S/m)
+sigma = 1.0  # Extracellular conductivity (S/m)
 
 df.parameters['allow_extrapolation'] = False
 
@@ -30,6 +30,7 @@ fem_fig_folder = join(root_folder, "fem_figs_control")
 # imem = np.array([[-1.0], [1.0]])
 # tvec = np.array([0.])
 source_pos = np.load(join(neural_sim_folder, "source_pos.npy"))
+source_line_pos = np.load(join(neural_sim_folder, "source_line_pos.npy"))
 # print(source_pos)
 
 imem = np.load(join(neural_sim_folder, "axon_imem.npy"))
@@ -38,15 +39,17 @@ tvec = np.load(join(neural_sim_folder, "axon_tvec.npy"))
 num_tsteps = imem.shape[1]
 num_sources = source_pos.shape[0]
 
-cell_plot_positions = [[-200, 0, 100],
+cell_plot_positions = [[-200, 0, 102.5],
                        [-150, 0, 2.5],
                        [0, 0, 2.5],
                        #[150, 0, 2.5]
                        ]
-
 cell_plot_idxs = []
 for p_idx in range(len(cell_plot_positions)):
     cell_plot_idxs.append(np.argmin(np.sum((cell_plot_positions[p_idx] - source_pos)**2, axis=1)))
+
+print(cell_plot_idxs)
+
 
 plot_idx_clrs = lambda idx: plt.cm.viridis(idx / (len(cell_plot_idxs) - 1))
 
@@ -79,7 +82,7 @@ def analytic_mea(x, y, z, t_idx):
     return phi
 
 
-def plot_FEM_results(phi, t_idx):
+def plot_and_save_FEM_results(phi, t_idx):
     """ Plot the set-up, transmembrane currents and electric potential
     """
     x = np.linspace(x0, x1, nx)
@@ -117,7 +120,7 @@ def plot_FEM_results(phi, t_idx):
     fig.subplots_adjust(hspace=0.9, bottom=0.12, top=0.97, left=0.12, wspace=0.4)
 
 
-    imem_max = np.max(np.abs(imem))
+    imem_max = np.max(np.abs(imem[cell_plot_idxs, :]))
     ax_vmem = fig.add_subplot(523, xlabel='time [ms]', ylabel='mV',
                                     xlim=[0, tvec[-1]], ylim=[-110, 30],
                           title='membrane potentials')
@@ -182,8 +185,10 @@ def simulate_FEM():
 
     # Define mesh
     mesh = df.Mesh(join(mesh_folder, "{}.xml".format(mesh_name)))
-    subdomains = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_physical_region.xml".format(mesh_name)))
-    boundaries = df.MeshFunction("size_t", mesh, join(mesh_folder, "{}_facet_region.xml".format(mesh_name)))
+    subdomains = df.MeshFunction("size_t", mesh, join(mesh_folder,
+                          "{}_physical_region.xml".format(mesh_name)))
+    boundaries = df.MeshFunction("size_t", mesh, join(mesh_folder,
+                          "{}_facet_region.xml".format(mesh_name)))
 
     print("Number of cells in mesh: ", mesh.num_cells())
     # mesh = refine_mesh(mesh)
@@ -200,23 +205,21 @@ def simulate_FEM():
     dx = df.Measure("dx", domain=mesh, subdomain_data=subdomains)
 
     a = df.inner(sigma_vec * df.grad(u), df.grad(v)) * dx(1)
-    # Define function space and basis functions
 
-    # This corresponds to Neumann boundary conditions zero, i.e. all outer boundaries are insulating.
+    # This corresponds to Neumann boundary conditions zero, i.e.
+    # all outer boundaries are insulating.
     L = df.Constant(0) * v * dx
 
-    # Define Dirichlet boundary conditions outer cylinder boundaries
+    # Define Dirichlet boundary conditions outer cylinder boundaries (ground)
     bcs = [df.DirichletBC(V, 0.0, boundaries, 1)]
 
     for t_idx in range(num_tsteps):
 
         f_name = join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx))
-        if os.path.isfile(f_name):
-            print("skipping ", f_name)
-            continue
+        #if os.path.isfile(f_name):
+        #    print("skipping ", f_name)
+        #    continue
 
-        # if not divmod(t_idx, SIZE)[1] == RANK:
-        #     continue
         print("Time step {} of {}".format(t_idx, num_tsteps))
         phi = df.Function(V)
         A = df.assemble(a)
@@ -236,7 +239,7 @@ def simulate_FEM():
         # df.File(join(out_folder, "phi_t_vec_{}.xml".format(t_idx))) << phi
         # np.save(join(out_folder, "phi_t_vec_{}.npy".format(t_idx)), phi.vector())
 
-        plot_FEM_results(phi, t_idx)
+        plot_and_save_FEM_results(phi, t_idx)
 
 def plot_soma_EAP_amp_with_distance():
     x = np.linspace(x0, x1, nx)
@@ -260,9 +263,11 @@ def plot_soma_EAP_amp_with_distance():
 
     plt.close("all")
     fig = plt.figure(figsize=[5, 5])
+    fig.subplots_adjust(left=0.15)
     ax1 = fig.add_subplot(111, xlabel="distance from soma ($\mu$m)", ylabel="$\mu$V", xlim=[0, 70])
     plt.plot(x[x_idxs] - soma_xpos, peak_to_peaks[x_idxs] * 1000)
     plt.savefig(join(root_folder, "peak_to_peak_amp_with_distance.pdf"))
+
 
 def reconstruct_MEA_times_from_FEM():
     x = np.linspace(x0, x1, nx)
@@ -295,10 +300,10 @@ def reconstruct_MEA_times_from_FEM():
                               )
 
     ax_mea_free = fig.add_subplot(338, xlabel=r'time [ms]', ylabel='$\phi$ (mV)',
-                                  xlim=[0, tvec[-1]], ylim=[-0.015, 0.015],
+                                  xlim=[0, tvec[-1]], ylim=[-0.005, 0.0025],
                             )
     ax_mea_tunnel = fig.add_subplot(339, xlabel=r'time [ms]', ylabel='$\phi$ (mV)',
-                                    xlim=[0, tvec[-1]], ylim=[-1.5, 1.5],
+                                    xlim=[0, tvec[-1]], ylim=[-0.5, 0.25],
                           )
 
     ax_mea_free.set_title("I", color="orange")
@@ -317,8 +322,12 @@ def reconstruct_MEA_times_from_FEM():
                               2000, -1000, ec="k", fc='0.7', linewidth=0.5)
     ax_setup.add_patch(rect_bottom)
 
-    ax_setup.plot(source_pos[:, 0], source_pos[:, 2], c='gray', lw=2)
-    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='gray', marker='^', ms=17)
+    for source_idx in range(len(source_line_pos)):
+        xstart, xend = source_line_pos[source_idx, :, 0]
+        zstart, zend = source_line_pos[source_idx, :, 2]
+
+        ax_setup.plot([xstart, xend], [zstart, zend], c='gray', lw=2, clip_on=False)
+    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='gray', marker='o', ms=19)
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
                       c=plot_idx_clrs(counter), marker='o')
@@ -339,7 +348,7 @@ def reconstruct_MEA_times_from_FEM():
 
     num = 11
     levels = np.logspace(-2.5, 0, num=num)
-    scale_max = 1.
+    scale_max = 0.3
 
     levels_norm = scale_max * np.concatenate((-levels[::-1], levels))
     bwr_cmap = plt.cm.get_cmap('bwr_r')  # rainbow, spectral, RdYlBu
@@ -371,9 +380,13 @@ def reconstruct_MEA_times_from_FEM():
     #                    fontsize=7, rotation=0)
 
 
+    ax_mea_free.plot(tvec, mea_analytic[0], lw=2, c='gray')
     l, = ax_mea_free.plot(tvec, mea_fem[0],  lw=2, c='k')
     la, = ax_mea_tunnel.plot(tvec, mea_fem[1],  lw=2, c='k', ls="-")
     # fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False, loc="lower right")
+
+    rel_error = np.max(np.abs((mea_analytic[0] - mea_fem[0])) / np.max(np.abs(mea_fem[0])))
+    print("Relative error between FEM and MoI (free elec): {:1.4f}".format(rel_error))
 
     t1 = ax_vmem.axvline(tvec[0], c='gray', ls="--")
     t2 = ax_mea_free.axvline(tvec[0], c='gray', ls="--")
@@ -395,7 +408,8 @@ def reconstruct_MEA_times_from_FEM():
         for tp in ep_intervals_.collections:
             tp.remove()
 
-        ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T, colors='k', linewidths=(1), zorder=-2,
+        ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T,
+                                         colors='k', linewidths=(1), zorder=-2,
                          levels=levels_norm)
 
         #ep_intervals.set_data(xz_masked[:, :, t_idx].T)
@@ -414,8 +428,8 @@ def reconstruct_MEA_times_from_FEM():
     t3.set_xdata(100)
 
     num = 11
-    levels = np.logspace(-2.5, 0, num=num)
-    scale_max = 1.
+    levels = np.logspace(-2.0, 0, num=num)
+    scale_max = 0.5
 
     levels_norm = scale_max * levels
     bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
@@ -442,9 +456,10 @@ def reconstruct_MEA_times_from_FEM():
     cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
     #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
     #                    fontsize=7, rotation=0)
-    plt.savefig(join(root_folder, 'max_results_{}_.png'.format(sim_name)))
+    plt.savefig(join(root_folder, 'max_results_{}_2.png'.format(sim_name)))
 
 
 if __name__ == '__main__':
+    # simulate_FEM()
     plot_soma_EAP_amp_with_distance()
     # reconstruct_MEA_times_from_FEM()
