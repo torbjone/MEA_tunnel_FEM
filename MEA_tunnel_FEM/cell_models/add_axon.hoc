@@ -36,9 +36,6 @@ proc biophys() {
 celldef()
 
 forall { insert pas
-        e_pas=-85}
-
-axon {
 	celsius = 33
 	Ri = 80
 	Cm = 1.0
@@ -49,6 +46,9 @@ axon {
     e_pas=v_init
     g_pas=1/Rm
     cm=Cm
+}
+
+axon {
 
     Kv1_collat	=	400
     na_collat	=	500

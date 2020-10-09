@@ -252,7 +252,6 @@ def plot_soma_EAP_amp_with_distance():
     soma_diam = 10
     soma_xpos = -200
     z_idx = np.argmin(np.abs(z - soma_height))
-
     x_idxs = np.where(x > soma_xpos + soma_diam)
 
     peak_to_peaks = np.zeros(len(x))
@@ -272,7 +271,6 @@ def plot_soma_EAP_amp_with_distance():
 def reconstruct_MEA_times_from_FEM():
     x = np.linspace(x0, x1, nx)
     z = np.linspace(z0, z1, nz)
-    y = np.linspace(y0, y1, nz)
 
     mea_x_plot_pos = np.array([np.argmin(np.abs(x - x_)) for x_ in [-150, 0]])
 
@@ -282,34 +280,62 @@ def reconstruct_MEA_times_from_FEM():
     mea_fem = np.zeros((len(mea_x_plot_pos), num_tsteps))
     phi_plane_xz = np.zeros((len(x), len(z), len(tvec)))
     for t_idx in range(num_tsteps):
-        phi_plane_xz[:, :, t_idx] = np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
+        phi_plane_xz[:, :, t_idx] = 1000 * np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
         # phi_plane_xy_ = np.load(join(out_folder, "phi_xy_t_vec_{}.npy".format(t_idx)))
-        mea_fem[:, t_idx] = np.load(join(out_folder, "phi_mea_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
-        mea_analytic[:, t_idx] = np.load(join(out_folder, "phi_mea_analytic_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
+        mea_fem[:, t_idx] = 1000 * np.load(join(out_folder, "phi_mea_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
+        mea_analytic[:, t_idx] = 1000 * np.load(join(out_folder, "phi_mea_analytic_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
+
+    noise_level = 10  # uV
+    soma_height = 100
+    soma_diam = 10
+    soma_xpos = -200
+    z_idx = np.argmin(np.abs(z - soma_height))
+    x_idxs = (-100 + soma_diam > x) & (x > soma_xpos + soma_diam)
+
+    peak_to_peaks = np.zeros(len(x))
+    for x_idx in range(len(x)):
+        peak_to_peaks[x_idx] = np.max(phi_plane_xz[x_idx, z_idx]) - np.min(phi_plane_xz[x_idx, z_idx])
 
     plt.close("all")
     fig = plt.figure(figsize=[9, 6])
-    fig.subplots_adjust(hspace=0.4, bottom=0.12, top=0.92, left=0.12, wspace=0.6, right=0.96)
+    fig.subplots_adjust(hspace=0.4, bottom=0.14, top=0.92, left=0.12, wspace=0.6, right=0.96)
 
     ax_setup = fig.add_axes([0.12, 0.4, 0.86, 0.6], aspect=1, xlabel='x [$\mu$m]', ylabel='z [$\mu$m]',
                             xlim=[x0 - 5, x1 + 5], ylim=[z0 - 45, z1 + 5])
 
-    ax_vmem = fig.add_subplot(337, xlabel='time [ms]', ylabel='membrane\npotential (mV)',
+    ax_vmem = fig.add_subplot(349, xlabel='time [ms]', #ylabel='membrane\npotential (mV)',
                                     xlim=[0, tvec[-1]], ylim=[-110, 40],
                           # title='membrane potentials'
                               )
 
-    ax_mea_free = fig.add_subplot(338, xlabel=r'time [ms]', ylabel='$\phi$ (mV)',
-                                  xlim=[0, tvec[-1]], ylim=[-0.005, 0.0025],
+    ax_mea_free = fig.add_subplot(3,4,10, xlabel=r'time [ms]', #ylabel='$\phi$ ($\mu$V)',
+                                  xlim=[0, tvec[-1]], ylim=[-5, 2.5],
                             )
-    ax_mea_tunnel = fig.add_subplot(339, xlabel=r'time [ms]', ylabel='$\phi$ (mV)',
-                                    xlim=[0, tvec[-1]], ylim=[-0.5, 0.25],
+    ax_mea_tunnel = fig.add_subplot(3, 4, 11, xlabel=r'time [ms]', #ylabel='$\phi$ ($\mu$V)',
+                                    xlim=[0, tvec[-1]], ylim=[-500, 250],
                           )
+    ax_EAP_decay = fig.add_subplot(3, 4, 12, xlabel='distance from\nsoma ($\mu$m)',
+                                   ylabel='peak-to-peak amp ($\mu$V)', xlim=[0, 100]
+                                       )
+    ax_vmem.set_ylabel('membrane\npotential (mV)', labelpad=-5)
+    ax_mea_free.set_ylabel('$\phi$ ($\mu$V)', labelpad=-5)
+    ax_mea_tunnel.set_ylabel('$\phi$ ($\mu$V)', labelpad=-5)
+
+    dist_from_soma = x[x_idxs] - soma_xpos
+
+    ax_EAP_decay.plot(dist_from_soma, peak_to_peaks[x_idxs], lw=2, c='b')
+    ax_setup.plot(x[x_idxs], np.ones(len(x[x_idxs])) * soma_height, ls=':', c='blue', lw=2)
+
+    noise_level_dist_idx = np.argmin(np.abs(peak_to_peaks[x_idxs] - noise_level))
+    noise_level_dist = dist_from_soma[noise_level_dist_idx]
+    ax_EAP_decay.axhline(noise_level, ls='--', c='gray')
+    ax_EAP_decay.axvline(noise_level_dist, ls='--', c='gray')
+    ax_EAP_decay.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(noise_level_dist))
 
     ax_mea_free.set_title("I", color="orange")
     ax_mea_tunnel.set_title("II", color="orange")
 
-    ax_setup.text(-185, 100, "soma", color="k", va='bottom')
+    #ax_setup.text(-185, 100, "soma", color="k", va='bottom')
     ax_setup.text(-195, 75, "axon", color="k", va='top', rotation=-90)
     ax_setup.text(95, 55, "tunnel lid", ha='right', va='top')
     ax_setup.text(247, -3, "electrode plate", ha='right', va='top')
@@ -347,7 +373,7 @@ def reconstruct_MEA_times_from_FEM():
 
 
     num = 11
-    levels = np.logspace(-2.5, 0, num=num)
+    levels = np.logspace(-2., 0, num=num)
     scale_max = 0.3
 
     levels_norm = scale_max * np.concatenate((-levels[::-1], levels))
@@ -359,7 +385,7 @@ def reconstruct_MEA_times_from_FEM():
 
     # xy_masked = np.ma.masked_where(np.isnan(phi_plane_xy.T), phi_plane_xy.T)
     xz_masked = np.ma.masked_where(np.isnan(phi_plane_xz), phi_plane_xz)
-    from matplotlib.colors import SymLogNorm, LogNorm
+    # from matplotlib.colors import SymLogNorm, LogNorm
 
     #img1 = ax_setup.imshow(xz_masked[:, :, 0].T, interpolation='nearest', origin='lower', cmap='bwr',
     #                  extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
@@ -374,7 +400,7 @@ def reconstruct_MEA_times_from_FEM():
 
     cax = fig.add_axes([0.83, 0.67, 0.01, 0.2])
 
-    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (mV)")
+    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ ($\mu$V)")
     cbar.set_ticks(np.array([-1, -0.1, -0.01, 0.01, 0.1, 1]) * scale_max)
     #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
     #                    fontsize=7, rotation=0)
@@ -394,11 +420,10 @@ def reconstruct_MEA_times_from_FEM():
 
 
     mark_subplots(ax_setup, "A", ypos=1.05, xpos=0.0)
-    simplify_axes([ax_setup, ax_mea_free, ax_mea_tunnel, ax_vmem])
-    mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel], "BCD", xpos=0.0)
+    simplify_axes([ax_setup, ax_mea_free, ax_mea_tunnel, ax_vmem, ax_EAP_decay])
+    mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel, ax_EAP_decay], "BCDE", xpos=-0.05, ypos=1.07)
 
     for t_idx in range(num_tsteps):
-        #ep_intervals.set_data
 
         for tp in ep_intervals.collections:
             tp.remove()
@@ -412,15 +437,11 @@ def reconstruct_MEA_times_from_FEM():
                                          colors='k', linewidths=(1), zorder=-2,
                          levels=levels_norm)
 
-        #ep_intervals.set_data(xz_masked[:, :, t_idx].T)
-                        #vmin=-vmax, vmax=vmax)
         t1.set_xdata(tvec[t_idx])
         t2.set_xdata(tvec[t_idx])
         t3.set_xdata(tvec[t_idx])
 
         plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
-
-    #ep_intervals.set_data([[]])
 
     cax.clear()
     t1.set_xdata(100)
@@ -429,7 +450,7 @@ def reconstruct_MEA_times_from_FEM():
 
     num = 11
     levels = np.logspace(-2.0, 0, num=num)
-    scale_max = 0.5
+    scale_max = 500
 
     levels_norm = scale_max * levels
     bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
@@ -452,7 +473,7 @@ def reconstruct_MEA_times_from_FEM():
     #img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T, interpolation='nearest', origin='lower', cmap='Reds',
     #                  extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
 
-    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (mV)")
+    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ ($\mu$V)")
     cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
     #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
     #                    fontsize=7, rotation=0)
@@ -460,6 +481,6 @@ def reconstruct_MEA_times_from_FEM():
 
 
 if __name__ == '__main__':
-    simulate_FEM()
-    plot_soma_EAP_amp_with_distance()
+    # simulate_FEM()
+    # plot_soma_EAP_amp_with_distance()
     reconstruct_MEA_times_from_FEM()
