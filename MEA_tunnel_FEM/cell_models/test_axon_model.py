@@ -24,8 +24,8 @@ cell_parameters = {
 }
 
 cell = LFPy.Cell(**cell_parameters)
-cell.set_rotation(x=np.pi/2)
-cell.set_pos(x=-200, z=102.5)
+cell.set_rotation(x=np.pi/2, )
+cell.set_pos(x=-200, z=65)
 
 stim_params = {
              'idx': 0,
@@ -73,7 +73,7 @@ mea_electrode.calc_lfp()
 soma_diam = 10
 elec_x = np.linspace(-200 + soma_diam/2, -100 + soma_diam/2, 50)
 elec_y = np.zeros(len(elec_x))
-elec_z = np.ones(len(elec_x)) * 100
+elec_z = np.ones(len(elec_x)) * 65
 
 # Define electrode parameters
 elec_parameters = {
@@ -92,7 +92,7 @@ fig.subplots_adjust(wspace=0.5, top=0.97, bottom=0.1)
 ax1 = fig.add_subplot(211, aspect=1, frameon=False, xlim=[-250, 250], ylim=[-30, 150])
 ax2 = fig.add_subplot(234, xlabel="time (ms)", ylabel="membrane\npotential (mV)")
 ax4 = fig.add_subplot(235, xlabel="time (ms)", ylabel="$\phi$ ($\mu$V)")
-ax5 = fig.add_subplot(236, xlabel="distance from soma ($\mu$m)", ylabel="Peak-to-peak\namplitude ($\mu$V)")
+ax5 = fig.add_subplot(236, xlabel="distance from soma ($\mu$m)", ylabel="amplitude ($\mu$V)")
 
 ax1.plot(elec_x, elec_z, ls=':', c='blue', lw=2)
 # from matplotlib.collections import PolyCollection
@@ -119,14 +119,13 @@ for elec_idx in range(len(elec_x_mea)):
     ax1.plot(elec_x_mea[elec_idx], elec_z_mea[elec_idx], 's')
     ax4.plot(cell.tvec, mea_electrode.LFP[elec_idx] * 1000)
 
-peak_to_peak_amps = np.zeros(len(elec_x))
+eap_amps = np.zeros(len(elec_x))
 for elec_idx in range(len(elec_x)):
-    peak_to_peak_amps[elec_idx] = 1000 * (np.max(electrode.LFP[elec_idx]) -
-                                   np.min(electrode.LFP[elec_idx]))
+    eap_amps[elec_idx] = 1000 * np.max(np.abs(electrode.LFP[elec_idx]))
 
-noise_level_dist_idx = np.argmin(np.abs(peak_to_peak_amps - noise_level))
+noise_level_dist_idx = np.argmin(np.abs(eap_amps - noise_level))
 noise_level_dist = elec_x[noise_level_dist_idx] - cell.xmid[0]
-ax5.plot(elec_x - cell.xmid[0], peak_to_peak_amps, 'b', lw=2)
+ax5.plot(elec_x - cell.xmid[0], eap_amps, 'b', lw=2)
 ax5.axhline(noise_level, ls='--', c='gray')
 ax5.axvline(noise_level_dist, ls='--', c='gray')
 ax5.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(noise_level_dist))

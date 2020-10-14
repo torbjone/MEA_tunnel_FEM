@@ -36,7 +36,7 @@ def return_cell():
 
     cell = LFPy.Cell(**cell_parameters)
     cell.set_rotation(x=np.pi/2)
-    cell.set_pos(x=-200, z=102.5)
+    cell.set_pos(x=-200, z=65)
 
     #  To induce a spike:
     synapseParameters = {

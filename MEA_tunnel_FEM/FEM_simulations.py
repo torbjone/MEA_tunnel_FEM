@@ -39,7 +39,7 @@ tvec = np.load(join(neural_sim_folder, "axon_tvec.npy"))
 num_tsteps = imem.shape[1]
 num_sources = source_pos.shape[0]
 
-cell_plot_positions = [[-200, 0, 102.5],
+cell_plot_positions = [[-200, 0, 65],
                        [-150, 0, 2.5],
                        [0, 0, 2.5],
                        #[150, 0, 2.5]
@@ -49,7 +49,6 @@ for p_idx in range(len(cell_plot_positions)):
     cell_plot_idxs.append(np.argmin(np.sum((cell_plot_positions[p_idx] - source_pos)**2, axis=1)))
 
 print(cell_plot_idxs)
-
 
 plot_idx_clrs = lambda idx: plt.cm.viridis(idx / (len(cell_plot_idxs) - 1))
 
@@ -62,7 +61,7 @@ dz_tunnel = 5
 cylinder_radius = 1000
 tunnel_radius = 5
 structure_radius = 100
-structure_height = 55
+structure_height = 25
 
 x0 = -cylinder_radius / 4
 x1 = cylinder_radius / 4
@@ -97,6 +96,7 @@ def plot_and_save_FEM_results(phi, t_idx):
 
     phi_plane_xz = np.zeros((len(x), len(z)))
     phi_plane_xy = np.zeros((len(x), len(z)))
+    moi_plane_xy = np.zeros((len(x), len(z)))
     for x_idx in range(len(x)):
         for z_idx in range(len(z)):
             try:
@@ -106,11 +106,14 @@ def plot_and_save_FEM_results(phi, t_idx):
         for y_idx in range(len(y)):
             try:
                 phi_plane_xy[x_idx, y_idx] = phi(x[x_idx], y[y_idx], 0.0 + eps)
+                moi_plane_xy[x_idx, y_idx] =  analytic_mea(x[x_idx], y[y_idx], 0.0 + eps, t_idx)
             except RuntimeError:
                 phi_plane_xy[x_idx, y_idx] = np.NaN
+                moi_plane_xy[x_idx, y_idx] = np.NaN
 
     np.save(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)), phi_plane_xz)
     np.save(join(out_folder, "phi_xy_t_vec_{}.npy".format(t_idx)), phi_plane_xy)
+    np.save(join(out_folder, "moi_xy_t_vec_{}.npy".format(t_idx)), moi_plane_xy)
     np.save(join(out_folder, "phi_mea_t_vec_{}.npy".format(t_idx)), mea_x_values)
     np.save(join(out_folder, "phi_mea_analytic_t_vec_{}.npy".format(t_idx)), analytic)
 
@@ -248,7 +251,7 @@ def plot_soma_EAP_amp_with_distance():
     for t_idx in range(num_tsteps):
         phi_plane_xz[:, :, t_idx] = np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
 
-    soma_height = 100
+    soma_height = 65
     soma_diam = 10
     soma_xpos = -200
     z_idx = np.argmin(np.abs(z - soma_height))
@@ -286,15 +289,15 @@ def reconstruct_MEA_times_from_FEM():
         mea_analytic[:, t_idx] = 1000 * np.load(join(out_folder, "phi_mea_analytic_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
 
     noise_level = 10  # uV
-    soma_height = 100
+    soma_height = 65
     soma_diam = 10
     soma_xpos = -200
     z_idx = np.argmin(np.abs(z - soma_height))
     x_idxs = (-100 + soma_diam > x) & (x > soma_xpos + soma_diam)
 
-    peak_to_peaks = np.zeros(len(x))
+    eap_amp = np.zeros(len(x))
     for x_idx in range(len(x)):
-        peak_to_peaks[x_idx] = np.max(phi_plane_xz[x_idx, z_idx]) - np.min(phi_plane_xz[x_idx, z_idx])
+        eap_amp[x_idx] = np.max(np.abs(phi_plane_xz[x_idx, z_idx]))
 
     plt.close("all")
     fig = plt.figure(figsize=[9, 6])
@@ -315,7 +318,7 @@ def reconstruct_MEA_times_from_FEM():
                                     xlim=[0, tvec[-1]], ylim=[-500, 250],
                           )
     ax_EAP_decay = fig.add_subplot(3, 4, 12, xlabel='distance from\nsoma ($\mu$m)',
-                                   ylabel='peak-to-peak amp ($\mu$V)', xlim=[0, 100]
+                                   ylabel='amplitude ($\mu$V)', xlim=[0, 100]
                                        )
     ax_vmem.set_ylabel('membrane\npotential (mV)', labelpad=-5)
     ax_mea_free.set_ylabel('$\phi$ ($\mu$V)', labelpad=-5)
@@ -323,10 +326,10 @@ def reconstruct_MEA_times_from_FEM():
 
     dist_from_soma = x[x_idxs] - soma_xpos
 
-    ax_EAP_decay.plot(dist_from_soma, peak_to_peaks[x_idxs], lw=2, c='b')
+    ax_EAP_decay.plot(dist_from_soma, eap_amp[x_idxs], lw=2, c='b')
     ax_setup.plot(x[x_idxs], np.ones(len(x[x_idxs])) * soma_height, ls=':', c='blue', lw=2)
 
-    noise_level_dist_idx = np.argmin(np.abs(peak_to_peaks[x_idxs] - noise_level))
+    noise_level_dist_idx = np.argmin(np.abs(eap_amp[x_idxs] - noise_level))
     noise_level_dist = dist_from_soma[noise_level_dist_idx]
     ax_EAP_decay.axhline(noise_level, ls='--', c='gray')
     ax_EAP_decay.axvline(noise_level_dist, ls='--', c='gray')
@@ -481,6 +484,6 @@ def reconstruct_MEA_times_from_FEM():
 
 
 if __name__ == '__main__':
-    # simulate_FEM()
-    # plot_soma_EAP_amp_with_distance()
+    simulate_FEM()
+    plot_soma_EAP_amp_with_distance()
     reconstruct_MEA_times_from_FEM()
