@@ -4,7 +4,7 @@ tunnel_mesh_size = 0.25;
 
 cylinder_radius = 1000;
 
-structure_radius = 100;
+structure_radius = 125;
 cover_height = 20;
 
 cylinder_height = cylinder_radius;

@@ -11,7 +11,7 @@ from plotting_convention import mark_subplots, simplify_axes
 
 
 eps = 1e-9
-sigma = 1.0  # Extracellular conductivity (S/m)
+sigma = 1.46  # Extracellular conductivity (S/m)
 
 df.parameters['allow_extrapolation'] = False
 
@@ -19,8 +19,8 @@ root_folder = '..'
 mesh_folder = join(root_folder, "mesh_nmi_tunnel")
 neural_sim_folder = join(root_folder, "neural_sim_results")
 mesh_name = "nmi_mea"
-out_folder = join(root_folder, 'results_highres')
-sim_name = "tunnel_test"
+out_folder = join(root_folder, 'results')
+sim_name = "nmi_tunnel"
 fem_fig_folder = join(root_folder, "fem_figs_control")
 [os.makedirs(f, exist_ok=True) for f in [out_folder, fem_fig_folder]]
 
@@ -60,7 +60,7 @@ dx_tunnel = 5
 dz_tunnel = 5
 cylinder_radius = 1000
 tunnel_radius = 5
-structure_radius = 100
+structure_radius = 125
 structure_height = 25
 
 x0 = -cylinder_radius / 4
