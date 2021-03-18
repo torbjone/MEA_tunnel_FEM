@@ -4,10 +4,27 @@ from os.path import join
 import numpy as np
 import matplotlib
 matplotlib.use("AGG")
+matplotlib.rc('pdf', fonttype=42)
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import dolfin as df
 from plotting_convention import mark_subplots, simplify_axes
+
+
+plt.rcParams.update({
+    'xtick.labelsize': 5,
+    'xtick.major.size': 2,
+    'ytick.labelsize': 5,
+    'ytick.major.size': 2,
+    'font.size': 7,
+    'font.family': "Arial",
+    'axes.labelsize': 5,
+    'axes.titlesize': 7,
+    'legend.fontsize': 5,
+    'figure.subplot.wspace': 0.4,
+    'figure.subplot.hspace': 0.4,
+    'figure.subplot.left': 0.1,
+})
 
 
 eps = 1e-9
@@ -31,7 +48,6 @@ fem_fig_folder = join(root_folder, "fem_figs_control")
 # tvec = np.array([0.])
 source_pos = np.load(join(neural_sim_folder, "source_pos.npy"))
 source_line_pos = np.load(join(neural_sim_folder, "source_line_pos.npy"))
-# print(source_pos)
 
 imem = np.load(join(neural_sim_folder, "axon_imem.npy"))
 vmem = np.load(join(neural_sim_folder, "axon_vmem.npy"))
@@ -39,18 +55,19 @@ tvec = np.load(join(neural_sim_folder, "axon_tvec.npy"))
 num_tsteps = imem.shape[1]
 num_sources = source_pos.shape[0]
 
+mea_x_positions = [-180, 0]
+
 cell_plot_positions = [[-200, 0, 65],
-                       [-150, 0, 2.5],
-                       [0, 0, 2.5],
+                       [mea_x_positions[0], 0, 2.5],
+                       [mea_x_positions[1], 0, 2.5],
                        #[150, 0, 2.5]
                        ]
 cell_plot_idxs = []
 for p_idx in range(len(cell_plot_positions)):
-    cell_plot_idxs.append(np.argmin(np.sum((cell_plot_positions[p_idx] - source_pos)**2, axis=1)))
+    cell_plot_idxs.append(np.argmin(np.sum((cell_plot_positions[p_idx] -
+                                            source_pos)**2, axis=1)))
 
-print(cell_plot_idxs)
-
-plot_idx_clrs = lambda idx: plt.cm.viridis(idx / (len(cell_plot_idxs) - 1))
+plot_idx_clrs = ["#6d319c", "#1f8f8b", "#cb089c"]
 
 nx = 200
 ny = 200
@@ -219,9 +236,9 @@ def simulate_FEM():
     for t_idx in range(num_tsteps):
 
         f_name = join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx))
-        #if os.path.isfile(f_name):
-        #    print("skipping ", f_name)
-        #    continue
+        if os.path.isfile(f_name):
+            print("skipping ", f_name)
+            continue
 
         print("Time step {} of {}".format(t_idx, num_tsteps))
         phi = df.Function(V)
@@ -271,11 +288,12 @@ def plot_soma_EAP_amp_with_distance():
     plt.savefig(join(root_folder, "peak_to_peak_amp_with_distance.pdf"))
 
 
-def reconstruct_MEA_times_from_FEM():
+def make_results_figure():
     x = np.linspace(x0, x1, nx)
     z = np.linspace(z0, z1, nz)
 
-    mea_x_plot_pos = np.array([np.argmin(np.abs(x - x_)) for x_ in [-150, 0]])
+    mea_x_plot_pos = np.array([np.argmin(np.abs(x - x_))
+                               for x_ in mea_x_positions])
 
     # print(mea_x_plot_pos, x[mea_x_plot_pos])
 
@@ -283,136 +301,140 @@ def reconstruct_MEA_times_from_FEM():
     mea_fem = np.zeros((len(mea_x_plot_pos), num_tsteps))
     phi_plane_xz = np.zeros((len(x), len(z), len(tvec)))
     for t_idx in range(num_tsteps):
-        phi_plane_xz[:, :, t_idx] = 1000 * np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
+        phi_plane_xz[:, :, t_idx] = 1000 * np.load(join(out_folder,
+                                        "phi_xz_t_vec_{}.npy".format(t_idx)))
         # phi_plane_xy_ = np.load(join(out_folder, "phi_xy_t_vec_{}.npy".format(t_idx)))
-        mea_fem[:, t_idx] = 1000 * np.load(join(out_folder, "phi_mea_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
-        mea_analytic[:, t_idx] = 1000 * np.load(join(out_folder, "phi_mea_analytic_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
+        mea_fem[:, t_idx] = 1000 * np.load(join(out_folder,
+                    "phi_mea_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
+        mea_analytic[:, t_idx] = 1000 * np.load(join(out_folder,
+             "phi_mea_analytic_t_vec_{}.npy".format(t_idx)))[mea_x_plot_pos]
 
     noise_level = 10  # uV
     soma_height = 65
-    soma_diam = 10
+    soma_diam = 8
     soma_xpos = -200
     z_idx = np.argmin(np.abs(z - soma_height))
-    x_idxs = (-100 + soma_diam > x) & (x > soma_xpos + soma_diam)
+    x_idxs = (-100 + soma_diam > x) & (x > soma_xpos + soma_diam / 2)
 
     eap_amp = np.zeros(len(x))
     for x_idx in range(len(x)):
         eap_amp[x_idx] = np.max(np.abs(phi_plane_xz[x_idx, z_idx]))
 
     plt.close("all")
-    fig = plt.figure(figsize=[9, 6])
-    fig.subplots_adjust(hspace=0.4, bottom=0.14, top=0.92, left=0.12, wspace=0.6, right=0.96)
+    fig = plt.figure(figsize=[68 * 0.03937, 48 * 0.03937])
+    fig.subplots_adjust(hspace=0.45, bottom=0.17, top=0.99,
+                        left=0.16, wspace=1.0, right=0.96)
 
-    ax_setup = fig.add_axes([0.12, 0.4, 0.86, 0.6], aspect=1, xlabel='x [$\mu$m]', ylabel='z [$\mu$m]',
+    ax_setup = fig.add_axes([0.11, 0.46, 0.87, 0.6], aspect=1,
                             xlim=[x0 - 5, x1 + 5], ylim=[z0 - 45, z1 + 5])
 
-    ax_vmem = fig.add_subplot(349, xlabel='time [ms]', #ylabel='membrane\npotential (mV)',
-                                    xlim=[0, tvec[-1]], ylim=[-110, 40],
-                          # title='membrane potentials'
-                              )
+    ax_vmem = fig.add_subplot(349, xlim=[0, tvec[-1]], ylim=[-110, 40])
 
-    ax_mea_free = fig.add_subplot(3,4,10, xlabel=r'time [ms]', #ylabel='$\phi$ ($\mu$V)',
-                                  xlim=[0, tvec[-1]], ylim=[-5, 2.5],
-                            )
-    ax_mea_tunnel = fig.add_subplot(3, 4, 11, xlabel=r'time [ms]', #ylabel='$\phi$ ($\mu$V)',
-                                    xlim=[0, tvec[-1]], ylim=[-500, 250],
-                          )
-    ax_EAP_decay = fig.add_subplot(3, 4, 12, xlabel='distance from\nsoma ($\mu$m)',
-                                   ylabel='amplitude ($\mu$V)', xlim=[0, 100]
-                                       )
-    ax_vmem.set_ylabel('membrane\npotential (mV)', labelpad=-5)
-    ax_mea_free.set_ylabel('$\phi$ ($\mu$V)', labelpad=-5)
-    ax_mea_tunnel.set_ylabel('$\phi$ ($\mu$V)', labelpad=-5)
+    ax_mea_free = fig.add_subplot(3, 4, 10, xlim=[0, tvec[-1]], ylim=[-8, 4])
+    ax_mea_tunnel = fig.add_subplot(3, 4, 11, xlim=[0, tvec[-1]],
+                                    ylim=[-600, 400])
+    ax_EAP_decay = fig.add_subplot(3, 4, 12, xlim=[0, 100])
+
+
+    ax_setup.set_xlabel('X (µm)', labelpad=-1)
+    ax_setup.set_ylabel('Z (µm)', labelpad=-1)
+
+    ax_vmem.set_ylabel('Membrane\npotential (mV)', labelpad=-1)
+    ax_vmem.set_xlabel('Time (ms)', labelpad=-0.1)
+
+    ax_mea_free.set_ylabel('$\phi$ (µV)', labelpad=-0)
+    ax_mea_free.set_xlabel('Time (ms)', labelpad=-0.1)
+
+    ax_mea_tunnel.set_ylabel('$\phi$ (µV)', labelpad=-9)
+    ax_mea_tunnel.set_xlabel('Time (ms)', labelpad=-0.1)
+
+    ax_EAP_decay.set_ylabel('Amplitude (µV)', labelpad=-0.0)
+    ax_EAP_decay.set_xlabel('Distance from\nsoma (µm)', labelpad=-0.0)
+
+    ax_mea_free.set_title("OµE", pad=-5)
+    ax_mea_tunnel.set_title("CµE", pad=-5)
 
     dist_from_soma = x[x_idxs] - soma_xpos
 
-    ax_EAP_decay.plot(dist_from_soma, eap_amp[x_idxs], lw=2, c='b')
-    ax_setup.plot(x[x_idxs], np.ones(len(x[x_idxs])) * soma_height, ls=':', c='blue', lw=2)
+    ax_EAP_decay.plot(dist_from_soma, eap_amp[x_idxs], lw=1, c='b')
+
+    ax_setup.plot(x[x_idxs], np.ones(len(x[x_idxs])) * soma_height,
+                  ls=':', c='blue', lw=1)
 
     noise_level_dist_idx = np.argmin(np.abs(eap_amp[x_idxs] - noise_level))
     noise_level_dist = dist_from_soma[noise_level_dist_idx]
-    ax_EAP_decay.axhline(noise_level, ls='--', c='gray')
-    ax_EAP_decay.axvline(noise_level_dist, ls='--', c='gray')
-    ax_EAP_decay.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(noise_level_dist))
+    ax_EAP_decay.axhline(noise_level, ls='--', c='gray', lw=0.5)
+    ax_EAP_decay.axvline(noise_level_dist, ls='--', c='gray', lw=0.5)
+    ax_EAP_decay.text(noise_level_dist + 5, noise_level + 5,
+                      "{:1.1f}\n µm".format(noise_level_dist), fontsize=6)
 
-    ax_mea_free.set_title("I", color="orange")
-    ax_mea_tunnel.set_title("II", color="orange")
-
-    #ax_setup.text(-185, 100, "soma", color="k", va='bottom')
-    ax_setup.text(-195, 75, "axon", color="k", va='top', rotation=-90)
-    ax_setup.text(95, 55, "tunnel lid", ha='right', va='top')
-    ax_setup.text(247, -3, "electrode plate", ha='right', va='top')
+    ax_setup.text(247, -25, "Substrate", ha='right', va='top')
     #  Draw set up with tunnel and axon
-    rect = mpatches.Rectangle([-structure_radius, tunnel_radius],
-                              2 * structure_radius, structure_height, ec="k", fc='0.8')
+    rect = mpatches.Rectangle([-structure_radius - 2, tunnel_radius],
+                              2 * structure_radius + 4, structure_height,
+                              ec="k", fc='0.8', linewidth=0.3)
     ax_setup.add_patch(rect)
 
     rect_bottom = mpatches.Rectangle([-1000, 0],
-                              2000, -1000, ec="k", fc='0.7', linewidth=0.5)
+                              2000, -1000, ec="k", fc='0.7', linewidth=0.3)
     ax_setup.add_patch(rect_bottom)
 
     for source_idx in range(len(source_line_pos)):
         xstart, xend = source_line_pos[source_idx, :, 0]
         zstart, zend = source_line_pos[source_idx, :, 2]
 
-        ax_setup.plot([xstart, xend], [zstart, zend], c='gray', lw=2, clip_on=False)
-    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='gray', marker='o', ms=19)
+        ax_setup.plot([xstart, xend], [zstart, zend], c='#18e10c', lw=0.3, clip_on=False)
+    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='#18e10c', marker='o', ms=6)
+
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
-                      c=plot_idx_clrs(counter), marker='o')
+                      c=plot_idx_clrs[counter], marker='o', ms=3)
         if p_idx > 0:
 
         # for mea_idx in mea_x_plot_pos:
             rect_elec = mpatches.Rectangle([source_pos[p_idx, 0] - 5, 0],
-                                              10, -5, ec="k", fc='orange', linewidth=0.5)
+                                              10, -5, ec="k", fc='k',
+                                           linewidth=0.5)
             ax_setup.add_patch(rect_elec)
             # ax_setup.arrow(source_pos[p_idx, 0], -5, 100, -70, lw=2,
             #                clip_on=False, color='orange', head_width=5)
             ax_setup.text(source_pos[p_idx, 0], - 6,
-                          ["I", "II"][counter - 1], color='orange', va='top', ha="center")
+                          ["OµE", "CµE"][counter - 1], va='top', ha="center")
 
     for counter, p_idx in enumerate(cell_plot_idxs):
-        ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs(counter), lw=2)
+        ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs[counter], lw=1)
 
 
     num = 11
     levels = np.logspace(-2., 0, num=num)
-    scale_max = 0.3
+    scale_max = 500
 
     levels_norm = scale_max * np.concatenate((-levels[::-1], levels))
     bwr_cmap = plt.cm.get_cmap('bwr_r')  # rainbow, spectral, RdYlBu
 
-    colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2))) for i in range(len(levels_norm) - 1)]
+    colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2)))
+                       for i in range(len(levels_norm) - 1)]
     colors_from_map[num - 1] = (1.0, 1.0, 1.0, 1.0)
 
-
-    # xy_masked = np.ma.masked_where(np.isnan(phi_plane_xy.T), phi_plane_xy.T)
     xz_masked = np.ma.masked_where(np.isnan(phi_plane_xz), phi_plane_xz)
-    # from matplotlib.colors import SymLogNorm, LogNorm
 
-    #img1 = ax_setup.imshow(xz_masked[:, :, 0].T, interpolation='nearest', origin='lower', cmap='bwr',
-    #                  extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
-    #vmax = 1
 
     ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, 0],
                                 zorder=-2, colors=colors_from_map,
                                 levels=levels_norm, extend='both')
 
-    ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, 0].T, colors='k', linewidths=(1), zorder=-2,
-                levels=levels_norm)
+    ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, 0].T, colors='k',
+                                     linewidths=(0.3), zorder=-2,
+                                     levels=levels_norm)
 
-    cax = fig.add_axes([0.83, 0.67, 0.01, 0.2])
+    cax = fig.add_axes([0.80, 0.7, 0.015, 0.2])
 
-    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ ($\mu$V)")
+    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (µV)")
     cbar.set_ticks(np.array([-1, -0.1, -0.01, 0.01, 0.1, 1]) * scale_max)
-    #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
-    #                    fontsize=7, rotation=0)
 
-
-    ax_mea_free.plot(tvec, mea_analytic[0], lw=2, c='gray')
-    l, = ax_mea_free.plot(tvec, mea_fem[0],  lw=2, c='k')
-    la, = ax_mea_tunnel.plot(tvec, mea_fem[1],  lw=2, c='k', ls="-")
-    # fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False, loc="lower right")
+    #ax_mea_free.plot(tvec, mea_analytic[0], lw=1, c='gray')
+    l, = ax_mea_free.plot(tvec, mea_fem[0],  lw=1, c='k')
+    la, = ax_mea_tunnel.plot(tvec, mea_fem[1],  lw=1, c='k', ls="-")
 
     rel_error = np.max(np.abs((mea_analytic[0] - mea_fem[0])) / np.max(np.abs(mea_fem[0])))
     print("Relative error between FEM and MoI (free elec): {:1.4f}".format(rel_error))
@@ -421,69 +443,96 @@ def reconstruct_MEA_times_from_FEM():
     t2 = ax_mea_free.axvline(tvec[0], c='gray', ls="--")
     t3 = ax_mea_tunnel.axvline(tvec[0], c='gray', ls="--")
 
-
-    mark_subplots(ax_setup, "A", ypos=1.05, xpos=0.0)
     simplify_axes([ax_setup, ax_mea_free, ax_mea_tunnel, ax_vmem, ax_EAP_decay])
-    mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel, ax_EAP_decay], "BCDE", xpos=-0.05, ypos=1.07)
+    #mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel, ax_EAP_decay], "BCDE", xpos=-0.05, ypos=1.07)
 
-    for t_idx in range(num_tsteps):
-
-        for tp in ep_intervals.collections:
-            tp.remove()
-        ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, t_idx].T,
-                                         zorder=-2, colors=colors_from_map,
-                                         levels=levels_norm, extend='both')
-        for tp in ep_intervals_.collections:
-            tp.remove()
-
-        ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T,
-                                         colors='k', linewidths=(1), zorder=-2,
-                         levels=levels_norm)
-
-        t1.set_xdata(tvec[t_idx])
-        t2.set_xdata(tvec[t_idx])
-        t3.set_xdata(tvec[t_idx])
-
-        plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
+    # for t_idx in range(num_tsteps):
+    #
+    #     for tp in ep_intervals.collections:
+    #         tp.remove()
+    #     ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, t_idx].T,
+    #                                      zorder=-2, colors=colors_from_map,
+    #                                      levels=levels_norm, extend='both')
+    #     for tp in ep_intervals_.collections:
+    #         tp.remove()
+    #
+    #     ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T,
+    #                                      colors='k', linewidths=(1), zorder=-2,
+    #                      levels=levels_norm)
+    #
+    #     t1.set_xdata(tvec[t_idx])
+    #     t2.set_xdata(tvec[t_idx])
+    #     t3.set_xdata(tvec[t_idx])
+    #
+    #     plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
 
     cax.clear()
     t1.set_xdata(100)
     t2.set_xdata(100)
     t3.set_xdata(100)
 
-    num = 11
-    levels = np.logspace(-2.0, 0, num=num)
-    scale_max = 500
+    # num = 11
+    # levels = np.logspace(-2.0, 0, num=num)
+    # scale_max = 500
+    # levels_norm = scale_max * levels
+    # bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
+    # colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2)))
+    #                    for i in range(len(levels_norm) - 1)]
+    #
+    #
 
-    levels_norm = scale_max * levels
-    bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
+    levels_norm = [0, 10.0, 1e9]#scale_max * levels
+    # bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
+    colors_from_map = ['0.95', 'orange', (0.5, 0.5, 0.5, 1)]
 
-    colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2))) for i in range(len(levels_norm) - 1)]
     #colors_from_map[0] = (1.0, 1.0, 1.0, 1.0)
 
 
+    xz_crossmax = np.array(np.max(np.abs(xz_masked[:, :, :]), axis=-1).T)
+
     for tp in ep_intervals.collections:
         tp.remove()
-    ep_intervals = ax_setup.contourf(x, z, np.max(np.abs(xz_masked[:, :, :]), axis=-1).T,
+    ep_intervals = ax_setup.contourf(x, z, xz_crossmax,
                                      zorder=-2, colors=colors_from_map,
                                      levels=levels_norm, extend='both')
 
     for tp in ep_intervals_.collections:
         tp.remove()
-    ep_intervals_ = ax_setup.contour(x, z, np.max(np.abs(xz_masked[:, :, :]), axis=-1).T, colors='k', linewidths=(1), zorder=-2,
+
+    ep_intervals_ = ax_setup.contour(x, z, xz_crossmax, colors='k',
+                                     linewidths=(0.3), zorder=-2,
                                      levels=levels_norm)
+
 
     #img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T, interpolation='nearest', origin='lower', cmap='Reds',
     #                  extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
 
-    cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ ($\mu$V)")
-    cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
+    cbar = plt.colorbar(ep_intervals, cax=cax)
+    # cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
+    # print(cbar.get_ticks())
+    cbar.set_ticks(np.array([5, 1e9/2]))
+    cbar.set_ticklabels(np.array(["<10 µV", ">10 µV"]))
     #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
     #                    fontsize=7, rotation=0)
-    plt.savefig(join(root_folder, 'max_results_{}_2.png'.format(sim_name)))
+    plt.savefig(join(root_folder, 'max_results_{}_4.png'.format(sim_name)), dpi=300)
+    plt.savefig(join(root_folder, 'max_results_{}_4.pdf'.format(sim_name)), dpi=300)
+    plt.savefig(join(root_folder, 'max_results_{}_4.eps'.format(sim_name)), dpi=300)
+
+
+    plot_data_folder = join(root_folder, 'figure_data')
+    os.makedirs(plot_data_folder, exist_ok=True)
+    np.save(join(plot_data_folder, "xz_max_amp.npy"), xz_crossmax)
+    np.save(join(plot_data_folder, "xz_x_values.npy"), x)
+    np.save(join(plot_data_folder, "xz_z_values.npy"), z)
+    np.save(join(plot_data_folder, "mea_phi_values.npy"), mea_fem)
+    np.save(join(plot_data_folder, "source_line_pos.npy"), source_line_pos)
+    np.save(join(plot_data_folder, "t_vec.npy"), tvec)
+    np.save(join(plot_data_folder, "memb_pot.npy"), vmem[cell_plot_idxs, :])
+    np.save(join(plot_data_folder, "eap_amp.npy"), eap_amp[x_idxs])
+    np.save(join(plot_data_folder, "eap_amp_dist.npy"), dist_from_soma)
 
 
 if __name__ == '__main__':
-    simulate_FEM()
-    plot_soma_EAP_amp_with_distance()
-    reconstruct_MEA_times_from_FEM()
+    #simulate_FEM()
+    # plot_soma_EAP_amp_with_distance()
+    make_results_figure()
