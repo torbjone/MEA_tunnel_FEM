@@ -1,5 +1,4 @@
 import os
-import sys
 from os.path import join
 import numpy as np
 import matplotlib
@@ -12,15 +11,15 @@ from plotting_convention import mark_subplots, simplify_axes
 
 
 plt.rcParams.update({
-    'xtick.labelsize': 5,
+    'xtick.labelsize': 6,
     'xtick.major.size': 2,
-    'ytick.labelsize': 5,
+    'ytick.labelsize': 6,
     'ytick.major.size': 2,
     'font.size': 7,
     'font.family': "Arial",
-    'axes.labelsize': 5,
+    'axes.labelsize': 6,
     'axes.titlesize': 7,
-    'legend.fontsize': 5,
+    'legend.fontsize': 6,
     'figure.subplot.wspace': 0.4,
     'figure.subplot.hspace': 0.4,
     'figure.subplot.left': 0.1,
@@ -89,6 +88,9 @@ z1 = cylinder_radius / 8
 
 
 def analytic_mea(x, y, z, t_idx):
+    """
+    Calculate extracellular potential analytically, through method of images
+    """
     phi = 0
     for idx in range(len(imem)):
         r = np.sqrt((x - source_pos[idx, 0])**2 +
@@ -98,7 +100,7 @@ def analytic_mea(x, y, z, t_idx):
     return phi
 
 
-def plot_and_save_FEM_results(phi, t_idx):
+def plot_and_save_simulation_results(phi, t_idx):
     """ Plot the set-up, transmembrane currents and electric potential
     """
     x = np.linspace(x0, x1, nx)
@@ -123,7 +125,8 @@ def plot_and_save_FEM_results(phi, t_idx):
         for y_idx in range(len(y)):
             try:
                 phi_plane_xy[x_idx, y_idx] = phi(x[x_idx], y[y_idx], 0.0 + eps)
-                moi_plane_xy[x_idx, y_idx] =  analytic_mea(x[x_idx], y[y_idx], 0.0 + eps, t_idx)
+                moi_plane_xy[x_idx, y_idx] =  analytic_mea(x[x_idx], y[y_idx],
+                                                           0.0 + eps, t_idx)
             except RuntimeError:
                 phi_plane_xy[x_idx, y_idx] = np.NaN
                 moi_plane_xy[x_idx, y_idx] = np.NaN
@@ -185,11 +188,14 @@ def plot_and_save_FEM_results(phi, t_idx):
 
     vmax = 1
     from matplotlib.colors import SymLogNorm
-    img1 = ax_xy.imshow(xy_masked, interpolation='nearest', origin='lower', cmap='bwr',
-                      extent=(x[0], x[-1], y[0], y[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
+    img1 = ax_xy.imshow(xy_masked, interpolation='nearest',
+                        origin='lower', cmap='bwr',
+                      extent=(x[0], x[-1], y[0], y[-1]),
+                        norm=SymLogNorm(0.01, vmax=1, vmin=-1))
                         #vmin=-vmax, vmax=vmax)
-    img2 = ax_xz.imshow(xz_masked, interpolation='nearest', origin='lower', cmap='bwr',
-                      extent=(x[0], x[-1], z[0], z[-1]), norm=SymLogNorm(0.01, vmax=1, vmin=-1))
+    img2 = ax_xz.imshow(xz_masked, interpolation='nearest', origin='lower',
+                        cmap='bwr', extent=(x[0], x[-1], z[0], z[-1]),
+                        norm=SymLogNorm(0.01, vmax=1, vmin=-1))
                         #vmin=-vmax, vmax=vmax)
 
     cax = fig.add_axes([0.85, 0.25, 0.01, 0.15])
@@ -197,8 +203,10 @@ def plot_and_save_FEM_results(phi, t_idx):
     plt.colorbar(img1, cax=cax, label="mV")
     l, = ax_mea.plot(x, mea_x_values,  lw=2, c='k')
     la, = ax_mea.plot(x, analytic,  lw=1, c='r', ls="--")
-    fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False, loc="lower right")
-    plt.savefig(join(fem_fig_folder, 'results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
+    fig.legend([l, la], ["FEM", "Analytic semi-infinite"], frameon=False,
+               loc="lower right")
+    plt.savefig(join(fem_fig_folder, 'results_{}_t_idx_{:04d}.png'.format(
+        sim_name, t_idx)))
 
 
 def simulate_FEM():
@@ -211,7 +219,6 @@ def simulate_FEM():
                           "{}_facet_region.xml".format(mesh_name)))
 
     print("Number of cells in mesh: ", mesh.num_cells())
-    # mesh = refine_mesh(mesh)
 
     np.save(join(out_folder, "mesh_coordinates.npy"), mesh.coordinates())
 
@@ -259,14 +266,16 @@ def simulate_FEM():
         # df.File(join(out_folder, "phi_t_vec_{}.xml".format(t_idx))) << phi
         # np.save(join(out_folder, "phi_t_vec_{}.npy".format(t_idx)), phi.vector())
 
-        plot_and_save_FEM_results(phi, t_idx)
+        plot_and_save_simulation_results(phi, t_idx)
+
 
 def plot_soma_EAP_amp_with_distance():
     x = np.linspace(x0, x1, nx)
     z = np.linspace(z0, z1, nz)
     phi_plane_xz = np.zeros((len(x), len(z), len(tvec)))
     for t_idx in range(num_tsteps):
-        phi_plane_xz[:, :, t_idx] = np.load(join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx)))
+        phi_plane_xz[:, :, t_idx] = np.load(join(out_folder,
+                                         "phi_xz_t_vec_{}.npy".format(t_idx)))
 
     soma_height = 65
     soma_diam = 10
@@ -276,14 +285,16 @@ def plot_soma_EAP_amp_with_distance():
 
     peak_to_peaks = np.zeros(len(x))
     for x_idx in range(len(x)):
-        peak_to_peaks[x_idx] = np.max(phi_plane_xz[x_idx, z_idx]) - np.min(phi_plane_xz[x_idx, z_idx])
+        peak_to_peaks[x_idx] = np.max(phi_plane_xz[x_idx, z_idx]) - \
+                               np.min(phi_plane_xz[x_idx, z_idx])
         plt.plot(phi_plane_xz[x_idx, z_idx])
     plt.savefig(join(root_folder, "all_spikes_x_dir.png"))
 
     plt.close("all")
     fig = plt.figure(figsize=[5, 5])
     fig.subplots_adjust(left=0.15)
-    ax1 = fig.add_subplot(111, xlabel="distance from soma ($\mu$m)", ylabel="$\mu$V", xlim=[0, 70])
+    ax1 = fig.add_subplot(111, xlabel="distance from soma ($\mu$m)",
+                          ylabel="$\mu$V", xlim=[0, 70])
     plt.plot(x[x_idxs] - soma_xpos, peak_to_peaks[x_idxs] * 1000)
     plt.savefig(join(root_folder, "peak_to_peak_amp_with_distance.pdf"))
 
@@ -321,38 +332,47 @@ def make_results_figure():
         eap_amp[x_idx] = np.max(np.abs(phi_plane_xz[x_idx, z_idx]))
 
     plt.close("all")
-    fig = plt.figure(figsize=[68 * 0.03937, 48 * 0.03937])
+    fig = plt.figure(figsize=[117 * 0.03937, 48 * 0.03937])
+    # fig = plt.figure(figsize=[117 * 0.03937 * 5, 48 * 0.03937 * 5])
     fig.subplots_adjust(hspace=0.45, bottom=0.17, top=0.99,
                         left=0.16, wspace=1.0, right=0.96)
 
-    ax_setup = fig.add_axes([0.11, 0.46, 0.87, 0.6], aspect=1,
-                            xlim=[x0 - 5, x1 + 5], ylim=[z0 - 45, z1 + 5])
+    ax_h = 0.20
+    ax_w = 0.08
+    ax_left = 0.11
 
-    ax_vmem = fig.add_subplot(349, xlim=[0, tvec[-1]], ylim=[-110, 40])
+    ax_setup = fig.add_axes([0.28, 0.13, 0.69, 0.85], #aspect=1,
+                            xlim=[-240, 145], ylim=[-15, 117])
 
-    ax_mea_free = fig.add_subplot(3, 4, 10, xlim=[0, tvec[-1]], ylim=[-8, 4])
-    ax_mea_tunnel = fig.add_subplot(3, 4, 11, xlim=[0, tvec[-1]],
+    ax_vmem = fig.add_axes([ax_left, 0.13 + 2 * (ax_h + 0.10), ax_w, ax_h],
+                           xlim=[0, tvec[-1]], ylim=[-110, 40])
+
+    ax_mea_free = fig.add_axes([ax_left, 0.13 + ax_h + 0.10, ax_w, ax_h],
+                               xlim=[0, tvec[-1]], ylim=[-8, 4])
+    ax_mea_tunnel = fig.add_axes([ax_left, 0.13, ax_w, ax_h], xlim=[0, tvec[-1]],
                                     ylim=[-600, 400])
-    ax_EAP_decay = fig.add_subplot(3, 4, 12, xlim=[0, 100])
+    ax_EAP_decay = fig.add_axes([0.63, 0.70, 0.08, 0.17],
+                                xlim=[0, 50], facecolor='none')
 
 
     ax_setup.set_xlabel('X (µm)', labelpad=-1)
     ax_setup.set_ylabel('Z (µm)', labelpad=-1)
 
-    ax_vmem.set_ylabel('Membrane\npotential (mV)', labelpad=-1)
-    ax_vmem.set_xlabel('Time (ms)', labelpad=-0.1)
+    ax_vmem.set_ylabel('Membrane\npotential (mV)', labelpad=0)
+    # ax_vmem.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_mea_free.set_ylabel('$\phi$ (µV)', labelpad=-0)
-    ax_mea_free.set_xlabel('Time (ms)', labelpad=-0.1)
+    ax_mea_free.set_ylabel('OµE (µV)', labelpad=9)
+    # ax_mea_free.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_mea_tunnel.set_ylabel('$\phi$ (µV)', labelpad=-9)
+    ax_mea_tunnel.set_ylabel('CµE (µV)', labelpad=2)
     ax_mea_tunnel.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_EAP_decay.set_ylabel('Amplitude (µV)', labelpad=-0.0)
+    ax_EAP_decay.set_ylabel('Amplitude (µV)', labelpad=1)
     ax_EAP_decay.set_xlabel('Distance from\nsoma (µm)', labelpad=-0.0)
 
-    ax_mea_free.set_title("OµE", pad=-5)
-    ax_mea_tunnel.set_title("CµE", pad=-5)
+    # ax_mea_free.set_title("OµE", pad=-5)
+    # ax_mea_tunnel.set_title("CµE", pad=-5)
+    ax_setup.text(139, -7, "Substrate", ha='right', va='top')
 
     dist_from_soma = x[x_idxs] - soma_xpos
 
@@ -365,10 +385,9 @@ def make_results_figure():
     noise_level_dist = dist_from_soma[noise_level_dist_idx]
     ax_EAP_decay.axhline(noise_level, ls='--', c='gray', lw=0.5)
     ax_EAP_decay.axvline(noise_level_dist, ls='--', c='gray', lw=0.5)
-    ax_EAP_decay.text(noise_level_dist + 5, noise_level + 5,
-                      "{:1.1f}\n µm".format(noise_level_dist), fontsize=6)
+    # ax_EAP_decay.text(noise_level_dist + 5, noise_level + 5,
+    #                   "{:1.1f}\n µm".format(noise_level_dist), fontsize=6)
 
-    ax_setup.text(247, -25, "Substrate", ha='right', va='top')
     #  Draw set up with tunnel and axon
     rect = mpatches.Rectangle([-structure_radius - 2, tunnel_radius],
                               2 * structure_radius + 4, structure_height,
@@ -383,27 +402,24 @@ def make_results_figure():
         xstart, xend = source_line_pos[source_idx, :, 0]
         zstart, zend = source_line_pos[source_idx, :, 2]
 
-        ax_setup.plot([xstart, xend], [zstart, zend], c='#18e10c', lw=0.3, clip_on=False)
-    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='#18e10c', marker='o', ms=6)
+        ax_setup.plot([xstart, xend], [zstart, zend], c='#18e10c', lw=0.3)
+    ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='#18e10c', marker='o',
+                  ms=14)
 
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
-                      c=plot_idx_clrs[counter], marker='o', ms=3)
+                      c=plot_idx_clrs[counter], marker='o', ms=5)
         if p_idx > 0:
 
-        # for mea_idx in mea_x_plot_pos:
             rect_elec = mpatches.Rectangle([source_pos[p_idx, 0] - 5, 0],
                                               10, -5, ec="k", fc='k',
                                            linewidth=0.5)
             ax_setup.add_patch(rect_elec)
-            # ax_setup.arrow(source_pos[p_idx, 0], -5, 100, -70, lw=2,
-            #                clip_on=False, color='orange', head_width=5)
             ax_setup.text(source_pos[p_idx, 0], - 6,
                           ["OµE", "CµE"][counter - 1], va='top', ha="center")
 
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs[counter], lw=1)
-
 
     num = 11
     levels = np.logspace(-2., 0, num=num)
@@ -418,7 +434,6 @@ def make_results_figure():
 
     xz_masked = np.ma.masked_where(np.isnan(phi_plane_xz), phi_plane_xz)
 
-
     ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, 0],
                                 zorder=-2, colors=colors_from_map,
                                 levels=levels_norm, extend='both')
@@ -427,7 +442,7 @@ def make_results_figure():
                                      linewidths=(0.3), zorder=-2,
                                      levels=levels_norm)
 
-    cax = fig.add_axes([0.80, 0.7, 0.015, 0.2])
+    cax = fig.add_axes([0.85, 0.5, 0.01, 0.35])
 
     cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (µV)")
     cbar.set_ticks(np.array([-1, -0.1, -0.01, 0.01, 0.1, 1]) * scale_max)
@@ -446,25 +461,27 @@ def make_results_figure():
     simplify_axes([ax_setup, ax_mea_free, ax_mea_tunnel, ax_vmem, ax_EAP_decay])
     #mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel, ax_EAP_decay], "BCDE", xpos=-0.05, ypos=1.07)
 
-    # for t_idx in range(num_tsteps):
-    #
-    #     for tp in ep_intervals.collections:
-    #         tp.remove()
-    #     ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, t_idx].T,
-    #                                      zorder=-2, colors=colors_from_map,
-    #                                      levels=levels_norm, extend='both')
-    #     for tp in ep_intervals_.collections:
-    #         tp.remove()
-    #
-    #     ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T,
-    #                                      colors='k', linewidths=(1), zorder=-2,
-    #                      levels=levels_norm)
-    #
-    #     t1.set_xdata(tvec[t_idx])
-    #     t2.set_xdata(tvec[t_idx])
-    #     t3.set_xdata(tvec[t_idx])
-    #
-    #     plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(sim_name, t_idx)))
+    # This is to make animation. Can be commented out to save time
+    for t_idx in range(num_tsteps):
+
+        for tp in ep_intervals.collections:
+            tp.remove()
+        ep_intervals = ax_setup.contourf(x, z, xz_masked[:, :, t_idx].T,
+                                         zorder=-2, colors=colors_from_map,
+                                         levels=levels_norm, extend='both')
+        for tp in ep_intervals_.collections:
+            tp.remove()
+
+        ep_intervals_ = ax_setup.contour(x, z, xz_masked[:, :, t_idx].T,
+                                         colors='k', linewidths=(1), zorder=-2,
+                         levels=levels_norm)
+
+        t1.set_xdata(tvec[t_idx])
+        t2.set_xdata(tvec[t_idx])
+        t3.set_xdata(tvec[t_idx])
+
+        plt.savefig(join(fem_fig_folder, 'anim_results_{}_t_idx_{:04d}.png'.format(
+            sim_name, t_idx)), dpi=300)
 
     cax.clear()
     t1.set_xdata(100)
@@ -487,7 +504,6 @@ def make_results_figure():
 
     #colors_from_map[0] = (1.0, 1.0, 1.0, 1.0)
 
-
     xz_crossmax = np.array(np.max(np.abs(xz_masked[:, :, :]), axis=-1).T)
 
     for tp in ep_intervals.collections:
@@ -499,24 +515,23 @@ def make_results_figure():
     for tp in ep_intervals_.collections:
         tp.remove()
 
-    ep_intervals_ = ax_setup.contour(x, z, xz_crossmax, colors='k',
-                                     linewidths=(0.3), zorder=-2,
-                                     levels=levels_norm)
+    # ep_intervals_ = ax_setup.contour(x, z, xz_crossmax, colors='k',
+    #                                  linewidths=(0.3), zorder=-2,
+    #                                  levels=levels_norm)
 
-
-    #img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T, interpolation='nearest', origin='lower', cmap='Reds',
-    #                  extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
+    #img1 = ax_setup.imshow(np.max(np.abs(xz_masked), axis=-1).T,
+    #           interpolation='nearest', origin='lower', cmap='Reds',
+    #           extent=(x[0], x[-1], z[0], z[-1]), norm=LogNorm(0.002, vmax=1))
 
     cbar = plt.colorbar(ep_intervals, cax=cax)
     # cbar.set_ticks(np.array([0.01, 0.1, 1]) * scale_max)
     # print(cbar.get_ticks())
     cbar.set_ticks(np.array([5, 1e9/2]))
     cbar.set_ticklabels(np.array(["<10 µV", ">10 µV"]))
-    #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1]) * scale_max, dtype=int),
-    #                    fontsize=7, rotation=0)
-    plt.savefig(join(root_folder, 'max_results_{}_4.png'.format(sim_name)), dpi=300)
-    plt.savefig(join(root_folder, 'max_results_{}_4.pdf'.format(sim_name)), dpi=300)
-    plt.savefig(join(root_folder, 'max_results_{}_4.eps'.format(sim_name)), dpi=300)
+    #cax.set_xticklabels(np.array(np.array([-1, -0.1, -0.01, 0, 0.01, 0.1, 1])
+                    # * scale_max, dtype=int), fontsize=7, rotation=0)
+    plt.savefig(join(root_folder, 'Fig_{}_4.png'.format(sim_name)), dpi=300)
+    plt.savefig(join(root_folder, 'Fig_{}_4.pdf'.format(sim_name)), dpi=300)
 
 
     plot_data_folder = join(root_folder, 'figure_data')
@@ -533,6 +548,6 @@ def make_results_figure():
 
 
 if __name__ == '__main__':
-    #simulate_FEM()
+    simulate_FEM()
     # plot_soma_EAP_amp_with_distance()
     make_results_figure()

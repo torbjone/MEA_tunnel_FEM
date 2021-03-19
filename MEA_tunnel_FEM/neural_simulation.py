@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 '''
-Toy example to get transmembrane currents from axon
+This file is for simulating the neural activity in a cell model with an axon
+Transmembrane currents, membrane potentials and morphology is saved to file
 '''
 import os
 from os.path import join
@@ -58,8 +59,6 @@ def return_cell():
 
 cell = return_cell()
 
-# print(cell.xmid, cell.ymid, cell.zmid)
-
 source_pos = np.array([cell.xmid, cell.ymid, cell.zmid]).T
 source_line_pos = np.array([[cell.xstart, cell.xend],
                             [cell.ystart, cell.yend],
@@ -79,11 +78,15 @@ fig = plt.figure(figsize=[9, 9])
 fig.subplots_adjust(wspace=0.5, hspace=0.5)
 
 
-ax0 = fig.add_subplot(221, xlabel="x ($\mu$m)", ylabel="z ($\mu$m)", title="morphology", aspect=1)
-ax1 = fig.add_subplot(222, xlabel="time (ms)", ylabel="membrane potential (mV)")
-ax2 = fig.add_subplot(223, xlabel="time (ms)", ylabel="transmembrane current (nA)")
+ax0 = fig.add_subplot(221, xlabel="x ($\mu$m)", ylabel="z ($\mu$m)",
+                      title="morphology", aspect=1)
+ax1 = fig.add_subplot(222, xlabel="time (ms)",
+                      ylabel="membrane potential (mV)")
+ax2 = fig.add_subplot(223, xlabel="time (ms)",
+                      ylabel="transmembrane current (nA)")
 ax3 = fig.add_subplot(224, xlabel="x ($\mu$m)",
-                      ylabel="Membrane current at t={:1.2f}".format(cell.tvec[max_vmem_t_idx]))
+                      ylabel="Membrane current at t={:1.2f}".format(
+                          cell.tvec[max_vmem_t_idx]))
 ax1.axvline(cell.tvec[max_imem_t_idx], ls=":", c='gray')
 ax2.axvline(cell.tvec[max_imem_t_idx], ls=":", c='gray')
 [ax1.plot(cell.tvec, cell.vmem[idx, :]) for idx in range(cell.totnsegs)]
@@ -93,7 +96,8 @@ for comp in range(cell.totnsegs):
     if comp == 0:
         ax0.plot(cell.xmid[comp], cell.zmid[comp], 'o', ms=12, c='k')
     else:
-        ax0.plot([cell.xstart[comp], cell.xend[comp]], [cell.zstart[comp], cell.zend[comp]], c='k')
+        ax0.plot([cell.xstart[comp], cell.xend[comp]],
+                 [cell.zstart[comp], cell.zend[comp]], c='k')
 
 clrs = lambda t_idx: plt.cm.Reds(t_idx / len(cell.tvec))
 for t_idx in np.arange(len(cell.tvec)):

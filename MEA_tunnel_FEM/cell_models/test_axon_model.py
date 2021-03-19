@@ -89,10 +89,12 @@ electrode.calc_lfp()
 
 fig = plt.figure(figsize=[9, 6])
 fig.subplots_adjust(wspace=0.5, top=0.97, bottom=0.1)
-ax1 = fig.add_subplot(211, aspect=1, frameon=False, xlim=[-250, 250], ylim=[-30, 150])
+ax1 = fig.add_subplot(211, aspect=1, frameon=False, xlim=[-250, 250],
+                      ylim=[-30, 150])
 ax2 = fig.add_subplot(234, xlabel="time (ms)", ylabel="membrane\npotential (mV)")
 ax4 = fig.add_subplot(235, xlabel="time (ms)", ylabel="$\phi$ ($\mu$V)")
-ax5 = fig.add_subplot(236, xlabel="distance from soma ($\mu$m)", ylabel="amplitude ($\mu$V)")
+ax5 = fig.add_subplot(236, xlabel="distance from soma ($\mu$m)",
+                      ylabel="amplitude ($\mu$V)")
 
 ax1.plot(elec_x, elec_z, ls=':', c='blue', lw=2)
 # from matplotlib.collections import PolyCollection
@@ -101,7 +103,8 @@ ax1.plot(elec_x, elec_z, ls=':', c='blue', lw=2)
 #     zips.append(list(zip(x, z)))
 # polycol = PolyCollection(zips, edgecolors='none', facecolors='k')
 # ax1.add_collection(polycol)
-[ax1.plot([cell.xstart[idx], cell.xend[idx]], [cell.zstart[idx], cell.zend[idx]], c='gray', lw=1) for idx in range(cell.totnsegs)]
+[ax1.plot([cell.xstart[idx], cell.xend[idx]], [cell.zstart[idx], cell.zend[idx]],
+          c='gray', lw=1) for idx in range(cell.totnsegs)]
 ax1.plot(cell.xmid[0], cell.zmid[0], 'o', c='gray', ms=18)
 
 
@@ -109,7 +112,8 @@ ax1.axhline(0)
 plot_idxs = np.array([0,
                       cell.get_closest_idx(x=-150, z=-2.5, y=0, section="axon"),
                       cell.get_closest_idx(x=0, z=-2.5, y=0, section="axon")])
-plot_idx_clrs = {idx: plt.cm.viridis(num / (len(plot_idxs) - 1)) for num, idx in enumerate(plot_idxs)}
+plot_idx_clrs = {idx: plt.cm.viridis(num / (len(plot_idxs) - 1))
+                 for num, idx in enumerate(plot_idxs)}
 
 for idx in plot_idxs:
     ax1.plot(cell.xmid[idx], cell.zmid[idx], 'o', c=plot_idx_clrs[idx])
@@ -128,7 +132,8 @@ noise_level_dist = elec_x[noise_level_dist_idx] - cell.xmid[0]
 ax5.plot(elec_x - cell.xmid[0], eap_amps, 'b', lw=2)
 ax5.axhline(noise_level, ls='--', c='gray')
 ax5.axvline(noise_level_dist, ls='--', c='gray')
-ax5.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(noise_level_dist))
+ax5.text(noise_level_dist + 2, noise_level + 5, "{:1.1f} $\mu$m".format(
+    noise_level_dist))
 
 
 plt.savefig(join("morph_test.png"))
