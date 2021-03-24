@@ -6,7 +6,7 @@ matplotlib.use("AGG")
 matplotlib.rc('pdf', fonttype=42)
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import dolfin as df
+
 from plotting_convention import mark_subplots, simplify_axes
 
 
@@ -28,8 +28,6 @@ plt.rcParams.update({
 
 eps = 1e-9
 sigma = 1.46  # Extracellular conductivity (S/m)
-
-df.parameters['allow_extrapolation'] = False
 
 root_folder = '..'
 mesh_folder = join(root_folder, "mesh_nmi_tunnel")
@@ -174,10 +172,10 @@ def plot_and_save_simulation_results(phi, t_idx):
     ax_setup.plot(source_pos[:, 0], source_pos[:, 2], c='g', lw=2)
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_setup.plot(source_pos[p_idx, 0], source_pos[p_idx, 2],
-                      c=plot_idx_clrs(counter), marker='o')
+                      c=plot_idx_clrs[counter], marker='o')
 
-        ax_imem.plot(tvec, imem[p_idx, :], c=plot_idx_clrs(counter))
-        ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs(counter))
+        ax_imem.plot(tvec, imem[p_idx, :], c=plot_idx_clrs[counter])
+        ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs[counter])
 
     ax_imem.axvline(tvec[t_idx], c='gray', ls="--")
     ax_vmem.axvline(tvec[t_idx], c='gray', ls="--")
@@ -211,6 +209,9 @@ def plot_and_save_simulation_results(phi, t_idx):
 
 def simulate_FEM():
 
+    import dolfin as df
+    df.parameters['allow_extrapolation'] = False
+
     # Define mesh
     mesh = df.Mesh(join(mesh_folder, "{}.xml".format(mesh_name)))
     subdomains = df.MeshFunction("size_t", mesh, join(mesh_folder,
@@ -243,9 +244,9 @@ def simulate_FEM():
     for t_idx in range(num_tsteps):
 
         f_name = join(out_folder, "phi_xz_t_vec_{}.npy".format(t_idx))
-        if os.path.isfile(f_name):
-            print("skipping ", f_name)
-            continue
+        # if os.path.isfile(f_name):
+        #     print("skipping ", f_name)
+        #     continue
 
         print("Time step {} of {}".format(t_idx, num_tsteps))
         phi = df.Function(V)
@@ -325,7 +326,7 @@ def make_results_figure():
     soma_diam = 8
     soma_xpos = -200
     z_idx = np.argmin(np.abs(z - soma_height))
-    x_idxs = (-100 + soma_diam > x) & (x > soma_xpos + soma_diam / 2)
+    x_idxs = (-150 + soma_diam > x) & (x > soma_xpos + soma_diam / 2)
 
     eap_amp = np.zeros(len(x))
     for x_idx in range(len(x)):
@@ -337,37 +338,40 @@ def make_results_figure():
     fig.subplots_adjust(hspace=0.45, bottom=0.17, top=0.99,
                         left=0.16, wspace=1.0, right=0.96)
 
-    ax_h = 0.20
-    ax_w = 0.08
-    ax_left = 0.11
+    ax_h = 0.25
+    ax_w = 0.11
+    ax_left = 0.10
 
     ax_setup = fig.add_axes([0.28, 0.13, 0.69, 0.85], #aspect=1,
                             xlim=[-240, 145], ylim=[-15, 117])
 
-    ax_vmem = fig.add_axes([ax_left, 0.13 + 2 * (ax_h + 0.10), ax_w, ax_h],
+    ax_vmem = fig.add_axes([ax_left, 0.13 + 2 * (ax_h + 0.04), ax_w, ax_h],
                            xlim=[0, tvec[-1]], ylim=[-110, 40])
 
-    ax_mea_free = fig.add_axes([ax_left, 0.13 + ax_h + 0.10, ax_w, ax_h],
+    ax_mea_free = fig.add_axes([ax_left, 0.13 + ax_h + 0.04, ax_w, ax_h],
                                xlim=[0, tvec[-1]], ylim=[-8, 4])
     ax_mea_tunnel = fig.add_axes([ax_left, 0.13, ax_w, ax_h], xlim=[0, tvec[-1]],
                                     ylim=[-600, 400])
-    ax_EAP_decay = fig.add_axes([0.63, 0.70, 0.08, 0.17],
+    ax_EAP_decay = fig.add_axes([0.57, 0.70, 0.08, 0.17],
                                 xlim=[0, 50], facecolor='none')
 
 
-    ax_setup.set_xlabel('X (µm)', labelpad=-1)
+    ax_setup.set_xlabel('X (µm)', labelpad=0)
     ax_setup.set_ylabel('Z (µm)', labelpad=-1)
 
     ax_vmem.set_ylabel('Membrane\npotential (mV)', labelpad=0)
+    ax_vmem.set_xticklabels(["", ""])
     # ax_vmem.set_xlabel('Time (ms)', labelpad=-0.1)
 
     ax_mea_free.set_ylabel('OµE (µV)', labelpad=9)
+    ax_mea_free.set_xticklabels(["", ""])
+
     # ax_mea_free.set_xlabel('Time (ms)', labelpad=-0.1)
 
     ax_mea_tunnel.set_ylabel('CµE (µV)', labelpad=2)
     ax_mea_tunnel.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_EAP_decay.set_ylabel('Amplitude (µV)', labelpad=1)
+    ax_EAP_decay.set_ylabel('Peak\namplitude (µV)', labelpad=1)
     ax_EAP_decay.set_xlabel('Distance from\nsoma (µm)', labelpad=-0.0)
 
     # ax_mea_free.set_title("OµE", pad=-5)
@@ -402,7 +406,8 @@ def make_results_figure():
         xstart, xend = source_line_pos[source_idx, :, 0]
         zstart, zend = source_line_pos[source_idx, :, 2]
 
-        ax_setup.plot([xstart, xend], [zstart, zend], c='#18e10c', lw=0.3)
+        ax_setup.plot([xstart, xend], [zstart, zend], c='#18e10c', lw=1,
+                      solid_capstyle="round", solid_joinstyle="round")
     ax_setup.plot(source_pos[0, 0], source_pos[0, 2], c='#18e10c', marker='o',
                   ms=14)
 
@@ -426,7 +431,7 @@ def make_results_figure():
     scale_max = 500
 
     levels_norm = scale_max * np.concatenate((-levels[::-1], levels))
-    bwr_cmap = plt.cm.get_cmap('bwr_r')  # rainbow, spectral, RdYlBu
+    bwr_cmap = plt.cm.get_cmap('bwr')  # rainbow, spectral, RdYlBu
 
     colors_from_map = [bwr_cmap(i * np.int(255 / (len(levels_norm) - 2)))
                        for i in range(len(levels_norm) - 1)]
@@ -445,14 +450,16 @@ def make_results_figure():
     cax = fig.add_axes([0.85, 0.5, 0.01, 0.35])
 
     cbar = plt.colorbar(ep_intervals, cax=cax, label="$\phi$ (µV)")
-    cbar.set_ticks(np.array([-1, -0.1, -0.01, 0.01, 0.1, 1]) * scale_max)
+    cbar.set_ticks(np.array([-1, -0.1, -0.02, 0.02, 0.1, 1]) * scale_max)
 
     #ax_mea_free.plot(tvec, mea_analytic[0], lw=1, c='gray')
     l, = ax_mea_free.plot(tvec, mea_fem[0],  lw=1, c='k')
     la, = ax_mea_tunnel.plot(tvec, mea_fem[1],  lw=1, c='k', ls="-")
 
-    rel_error = np.max(np.abs((mea_analytic[0] - mea_fem[0])) / np.max(np.abs(mea_fem[0])))
-    print("Relative error between FEM and MoI (free elec): {:1.4f}".format(rel_error))
+    rel_error = np.max(np.abs((mea_analytic[0] - mea_fem[0])) / np.max(
+        np.abs(mea_fem[0])))
+    print("Relative error between FEM and MoI (free elec): {:1.4f}".format(
+        rel_error))
 
     t1 = ax_vmem.axvline(tvec[0], c='gray', ls="--")
     t2 = ax_mea_free.axvline(tvec[0], c='gray', ls="--")
@@ -461,7 +468,7 @@ def make_results_figure():
     simplify_axes([ax_setup, ax_mea_free, ax_mea_tunnel, ax_vmem, ax_EAP_decay])
     #mark_subplots([ax_vmem, ax_mea_free, ax_mea_tunnel, ax_EAP_decay], "BCDE", xpos=-0.05, ypos=1.07)
 
-    # This is to make animation. Can be commented out to save time
+    ## This is to make animation. Can be commented out to save time
     for t_idx in range(num_tsteps):
 
         for tp in ep_intervals.collections:
@@ -500,7 +507,7 @@ def make_results_figure():
 
     levels_norm = [0, 10.0, 1e9]#scale_max * levels
     # bwr_cmap = plt.cm.get_cmap('Reds')  # rainbow, spectral, RdYlBu
-    colors_from_map = ['0.95', 'orange', (0.5, 0.5, 0.5, 1)]
+    colors_from_map = ['0.95', '#ffbbbb', (0.5, 0.5, 0.5, 1)]
 
     #colors_from_map[0] = (1.0, 1.0, 1.0, 1.0)
 
@@ -548,6 +555,6 @@ def make_results_figure():
 
 
 if __name__ == '__main__':
-    simulate_FEM()
+    #simulate_FEM()
     # plot_soma_EAP_amp_with_distance()
     make_results_figure()
