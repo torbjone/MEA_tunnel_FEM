@@ -363,12 +363,12 @@ def make_results_figure():
     ax_vmem.set_xticklabels(["", ""])
     # ax_vmem.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_mea_free.set_ylabel('OµE (µV)', labelpad=9)
+    ax_mea_free.set_ylabel('OME (µV)', labelpad=9)
     ax_mea_free.set_xticklabels(["", ""])
 
     # ax_mea_free.set_xlabel('Time (ms)', labelpad=-0.1)
 
-    ax_mea_tunnel.set_ylabel('CµE (µV)', labelpad=2)
+    ax_mea_tunnel.set_ylabel('CME (µV)', labelpad=2)
     ax_mea_tunnel.set_xlabel('Time (ms)', labelpad=-0.1)
 
     ax_EAP_decay.set_ylabel('Peak\namplitude (µV)', labelpad=1)
@@ -421,7 +421,7 @@ def make_results_figure():
                                            linewidth=0.5)
             ax_setup.add_patch(rect_elec)
             ax_setup.text(source_pos[p_idx, 0], - 6,
-                          ["OµE", "CµE"][counter - 1], va='top', ha="center")
+                          ["OME", "CME"][counter - 1], va='top', ha="center")
 
     for counter, p_idx in enumerate(cell_plot_idxs):
         ax_vmem.plot(tvec, vmem[p_idx, :], c=plot_idx_clrs[counter], lw=1)
